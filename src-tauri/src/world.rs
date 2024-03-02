@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use rand::{Rng, distributions::{Standard, Distribution}};
 use serde::Serialize;
 
-const WORLD_WIDTH: usize = 32;
+pub const WORLD_WIDTH: usize = 32;
 
 #[derive(PartialEq, Clone, Serialize)]
 pub enum Cell {

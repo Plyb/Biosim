@@ -3,7 +3,7 @@
 use std::{thread, time};
 
 use tauri::{Manager, Window};
-use world::World;
+use world::{World, WORLD_WIDTH};
 
 mod world;
 
@@ -18,6 +18,7 @@ fn main() {
 
       Ok(())
     })
+    .invoke_handler(tauri::generate_handler![get_world_width])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
@@ -30,4 +31,9 @@ fn start_simulation(window : Window) {
     world = world.tick();
     thread::sleep(time::Duration::from_millis(500));
   }
+}
+
+#[tauri::command]
+fn get_world_width() -> usize {
+  WORLD_WIDTH
 }
