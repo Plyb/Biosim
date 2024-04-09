@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{thread, time};
 
-use tauri::{Manager, Window};
+use tauri::{LogicalSize, Manager, Size, Window};
 use world::{World, WORLD_WIDTH};
 
 mod world;
@@ -11,6 +11,9 @@ fn main() {
   tauri::Builder::default()
     .setup(|app| {
       let main_window = app.get_window("main").unwrap();
+      let _ = main_window.set_size(
+        Size::Logical(LogicalSize { width: 500.0, height: 500.0})
+      );
 
       thread::spawn(move || {
         start_simulation(main_window)
