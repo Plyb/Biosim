@@ -1,7 +1,29 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::{thread, time};
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use std::{f32::consts::PI, thread, time};
+use bevy::{
+  core_pipeline::core_2d::Transparent2d,
+  prelude::*,
+  render::{
+      mesh::{Indices, MeshVertexAttribute},
+      render_asset::{RenderAssetUsages, RenderAssets},
+      render_phase::{AddRenderCommand, DrawFunctions, RenderPhase, SetItemPipeline},
+      render_resource::{
+          BlendState, ColorTargetState, ColorWrites, Face, FragmentState, FrontFace,
+          MultisampleState, PipelineCache, PolygonMode, PrimitiveState, PrimitiveTopology,
+          PushConstantRange, RenderPipelineDescriptor, ShaderStages, SpecializedRenderPipeline,
+          SpecializedRenderPipelines, TextureFormat, VertexBufferLayout, VertexFormat,
+          VertexState, VertexStepMode,
+      },
+      texture::BevyDefault,
+      view::{ExtractedView, ViewTarget, VisibleEntities},
+      Extract, Render, RenderApp, RenderSet,
+  },
+  sprite::{
+      extract_mesh2d, DrawMesh2d, Material2dBindGroupId, MaterialMesh2dBundle, Mesh2d, Mesh2dHandle, Mesh2dPipeline, Mesh2dPipelineKey, Mesh2dRenderPlugin, Mesh2dTransforms, MeshFlags, RenderMesh2dInstance, RenderMesh2dInstances, SetMesh2dBindGroup, SetMesh2dViewBindGroup
+  },
+  utils::FloatOrd,
+};
 
 use tauri::{LogicalSize, Manager, Size, Window};
 use world::{World, WORLD_WIDTH};
@@ -50,12 +72,51 @@ struct GreetTimer(Timer);
 
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<ColorMaterial>>) {
   commands.spawn(Camera2dBundle::default());
-  commands.spawn(MaterialMesh2dBundle {
-    mesh: meshes.add(Rectangle::default()).into(),
-    transform: Transform::default().with_scale(Vec3::splat(128.)),
-    material: materials.add(Color::PURPLE),
-    ..default()
-  });
+
+  let mut star = Mesh::new(
+    PrimitiveTopology::TriangleList,
+    RenderAssetUsages::RENDER_WORLD,
+  );
+
+  let mut v_pos = vec![[0.0, 0.0, 0.0]];
+    for i in 0..10 {
+        // The angle between each vertex is 1/10 of a full rotation.
+        let a = i as f32 * PI / 5.0;
+        // The radius of inner vertices (even indices) is 100. For outer vertices (odd indices) it's 200.
+        let r = (1 - i % 2) as f32 * 100.0 + 100.0;
+        // Add the vertex position.
+        v_pos.push([r * a.sin(), r * a.cos(), 0.0]);
+    }
+    // Set the position attribute
+    star.insert_attribute(Mesh::ATTRIBUTE_POSITION, v_pos);
+    // And a RGB color attribute as well
+    let mut v_color: Vec<[f32; 4]> = vec![Color::BLACK.as_linear_rgba_f32()];
+    v_color.extend_from_slice(&[Color::YELLOW.as_linear_rgba_f32(); 10]);
+    star.insert_attribute(
+        Mesh::ATTRIBUTE_COLOR,
+        v_color,
+    );
+
+    let mut indices = vec![0, 1, 10];
+    for i in 2..=10 {
+        indices.extend_from_slice(&[0, i, i - 1]);
+    }
+    star.insert_indices(Indices::U32(indices));
+
+    commands.spawn(MaterialMesh2dBundle {
+      mesh: meshes.add(star).into(),
+      material: materials.add(Color::WHITE),
+      ..default()
+    });
+
+  //   commands.spawn((
+  //     // We use a marker component to identify the custom colored meshes
+  //     Mesh2d,
+  //     // The `Handle<Mesh>` needs to be wrapped in a `Mesh2dHandle` to use 2d rendering instead of 3d
+  //     Mesh2dHandle(meshes.add(star)),
+  //     // This bundle's components are needed for something to be rendered
+  //     SpatialBundle::INHERITED_IDENTITY,
+  // ));
 }
 
 fn add_people(mut commands: Commands) {
