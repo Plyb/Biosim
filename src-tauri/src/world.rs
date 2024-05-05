@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use rand::{Rng, distributions::{Standard, Distribution}};
 use serde::Serialize;
+use serde_big_array::Array;
 
 pub const WORLD_WIDTH: usize = 32;
 
@@ -44,13 +45,13 @@ impl ToString for Cell {
 
 #[derive(Default, Serialize, Clone)]
 pub struct World {
-    pub cells: [[Cell; WORLD_WIDTH]; WORLD_WIDTH]
-}
+    pub cells: Vec<Array<Cell, WORLD_WIDTH>>}
 
 impl World {
     pub fn new_random() -> World {
-        let mut cells: [[Cell; WORLD_WIDTH]; WORLD_WIDTH] = [[Cell::Dead; WORLD_WIDTH]; WORLD_WIDTH];
+        let mut cells: Vec<Array<Cell, WORLD_WIDTH>> = Vec::with_capacity(WORLD_WIDTH);
         for x in 0..WORLD_WIDTH {
+            cells.push(Array([Cell::Dead; WORLD_WIDTH]));
             for y in 0..WORLD_WIDTH {
                 cells[x][y] = rand::random();
             }
@@ -60,8 +61,10 @@ impl World {
 
     pub fn tick(&self) -> World {
         let mut new_world : World = Default::default();
+        new_world.cells = Vec::with_capacity(WORLD_WIDTH);
 
         for x in 0..WORLD_WIDTH {
+            new_world.cells.push(Array([Cell::Dead; WORLD_WIDTH]));
             for y in 0..WORLD_WIDTH {
                 new_world.cells[x][y] = self.get_new_state(x, y);
             }
@@ -110,11 +113,11 @@ impl World {
 
 impl Debug for World {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = self.cells.map(|row| {
+        let string = self.cells.iter().map(|row| {
             row.map(|cell| {
                 cell.to_string()
             }).join("")
-        }).join("\n");
+        }).collect::<Vec<_>>().join("\n");
 
         write!(f, "{}", string)
     }
