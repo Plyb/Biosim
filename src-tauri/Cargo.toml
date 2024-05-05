@@ -22,6 +22,7 @@ rand = "0.8.5"
 arr_macro = "0.2.1"
 serde-big-array = "0.5.1"
 bevy = "0.13.2"
+bevy_pancam = "0.11.1"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

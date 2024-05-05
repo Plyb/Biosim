@@ -25,6 +25,7 @@ use bevy::{
   utils::FloatOrd,
 };
 
+use bevy_pancam::{PanCam, PanCamPlugin};
 use tauri::{LogicalSize, Manager, Size, Window};
 use world::{World, WORLD_WIDTH};
 
@@ -56,7 +57,8 @@ pub struct HelloPlugin;
 
 impl Plugin for HelloPlugin {
   fn build(&self, app: &mut App) {
-    app.insert_resource(GreetTimer(Timer::from_seconds(2.0, TimerMode::Repeating)))
+    app.add_plugins(PanCamPlugin::default())
+      .insert_resource(GreetTimer(Timer::from_seconds(2.0, TimerMode::Repeating)))
       .add_systems(Startup, setup);
   }
 }
@@ -71,7 +73,8 @@ struct Name(String);
 struct GreetTimer(Timer);
 
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<ColorMaterial>>) {
-  commands.spawn(Camera2dBundle::default());
+  commands.spawn(Camera2dBundle::default())
+    .insert(PanCam::default());;
 
   commands.spawn(MaterialMesh2dBundle {
     mesh: meshes.add(build_hex_grid_mesh()).into(),
