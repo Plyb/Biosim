@@ -1,23 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::f32::consts::PI;
 use arr_macro::arr;
 use bevy::{
   prelude::*,
-  render::{
-      mesh::Indices,
-      render_asset::RenderAssetUsages,
-      render_resource::PrimitiveTopology,
-  },
-  sprite::{
-      MaterialMesh2dBundle, Mesh2dHandle
-  },
+  sprite::Mesh2dHandle,
 };
+use bevy::sprite::MaterialMesh2dBundle;
 
 use bevy_pancam::{PanCam, PanCamPlugin};
-use world::{Cell, World, WORLD_WIDTH};
+use hex_grid::build_hex_grid_mesh;
+use world::{Cell, World};
 
 mod world;
+mod hex_grid;
 
 fn main() {
   App::new()
@@ -52,68 +47,6 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
 #[derive(Component)]
 struct WorldComponent(World);
-
-const NUM_VERTS_PER_HEX: u32 = 6;
-fn build_hex_grid_mesh() -> Mesh {
-  let mut mesh = Mesh::new(
-    PrimitiveTopology::TriangleList,
-    RenderAssetUsages::all()
-  );
-  mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, get_positions());
-  mesh.insert_indices(Indices::U32(get_indices()));
-  mesh.insert_attribute(
-    Mesh::ATTRIBUTE_COLOR, 
-    vec![
-      Color::WHITE.as_linear_rgba_f32();
-      WORLD_WIDTH * WORLD_WIDTH * NUM_VERTS_PER_HEX as usize
-    ]
-  );
-
-  mesh
-}
-
-fn get_positions() -> Vec<[f32; 3]> {
-  let mut positions: Vec<[f32; 3]> = vec![];
-
-  let delta_y = (3.0f32).sqrt() / 2.;
-  for x in 0..WORLD_WIDTH {
-    for y in 0..WORLD_WIDTH {
-      let x_center = (3. * x as f32) + (3. * (y as f32 / 2.));
-      let y_center = delta_y * y as f32;
-
-      for v in 0..6 {
-        positions.push(get_hex_vertex_pos(x_center, y_center, v))
-      }
-    }
-  }
-
-  positions
-}
-
-fn get_hex_vertex_pos(x_center: f32, y_center: f32, vertex_index: usize) -> [f32; 3] {
-  const ANGLE_MULTIPLIER: f32 = PI / 3.;
-
-  let angle = ANGLE_MULTIPLIER * vertex_index as f32;
-  [angle.cos() + x_center, angle.sin() + y_center, 0.]
-}
-
-fn get_indices() -> Vec<u32> {
-  let mut indices: Vec<u32> = vec![];
-
-  for x in 0..WORLD_WIDTH {
-    for y in 0..WORLD_WIDTH {
-      let offset = (x as u32 + (y * WORLD_WIDTH) as u32) * NUM_VERTS_PER_HEX;
-      indices.extend_from_slice(&[
-        offset + 0, offset + 1, offset + 5,
-        offset + 1, offset + 2, offset + 5,
-        offset + 2, offset + 4, offset + 5,
-        offset + 2, offset + 3, offset + 4,
-      ]);
-    }
-  }
-
-  indices
-}
 
 fn update_world(mut meshes: ResMut<Assets<Mesh>>, mut timer: ResMut<WorldTickTimer>, time: Res<Time>, mut query: Query<(&mut WorldComponent, &mut Mesh2dHandle)>) {
   if !timer.0.tick(time.delta()).just_finished() {
