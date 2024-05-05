@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{f32::consts::PI, thread, time};
+use arr_macro::arr;
 use bevy::{
   core_pipeline::core_2d::Transparent2d,
   prelude::*,
@@ -27,7 +28,7 @@ use bevy::{
 
 use bevy_pancam::{PanCam, PanCamPlugin};
 use tauri::{LogicalSize, Manager, Size, Window};
-use world::{World, WORLD_WIDTH};
+use world::{Cell, World, WORLD_WIDTH};
 
 mod world;
 
@@ -58,8 +59,9 @@ pub struct HelloPlugin;
 impl Plugin for HelloPlugin {
   fn build(&self, app: &mut App) {
     app.add_plugins(PanCamPlugin::default())
-      .insert_resource(GreetTimer(Timer::from_seconds(2.0, TimerMode::Repeating)))
-      .add_systems(Startup, setup);
+      .insert_resource(GreetTimer(Timer::from_seconds(0.5, TimerMode::Repeating)))
+      .add_systems(Startup, setup)
+      .add_systems(Update, update_world);
   }
 }
 
@@ -80,15 +82,17 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     mesh: meshes.add(build_hex_grid_mesh()).into(),
     material: materials.add(Color::WHITE),
     ..default()
-  });
-}
+  }).insert(WorldComponent(World::new_random()));
+} 
 
+#[derive(Component)]
+struct WorldComponent(World);
 
 const NUM_VERTS_PER_HEX: u32 = 6;
 fn build_hex_grid_mesh() -> Mesh {
   let mut mesh = Mesh::new(
     PrimitiveTopology::TriangleList,
-     RenderAssetUsages::RENDER_WORLD
+    RenderAssetUsages::all()
   );
   mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, get_positions());
   mesh.insert_indices(Indices::U32(get_indices()));
@@ -157,6 +161,27 @@ fn greet_people(time: Res<Time>, mut timer: ResMut<GreetTimer>, query: Query<&Na
     for name in &query {
         println!("hello {}!", name.0);
     }
+  }
+}
+
+fn update_world(mut meshes: ResMut<Assets<Mesh>>, mut timer: ResMut<GreetTimer>, time: Res<Time>, mut query: Query<(&mut WorldComponent, &mut Mesh2dHandle)>) {
+  if !timer.0.tick(time.delta()).just_finished() {
+    return;
+  }
+
+  for (mut world_component, mut mesh_handle) in &mut query {
+    let Some(mesh) = meshes.get_mut(mesh_handle.0.id()) else {
+      break;
+    };
+
+    let cells: Vec<&Cell> = world_component.0.cells.iter().flat_map(|row| row.iter()).collect();
+    let colors: Vec<[f32; 4]> = cells.iter().flat_map(|cell| 
+      if **cell == Cell::Alive { arr![[0., 0., 0., 1.]; 6] } else { arr![[1., 1., 1., 1.]; 6] }
+    ).collect();
+
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+
+    world_component.0 = world_component.0.tick();
   }
 }
 
