@@ -28,3 +28,6 @@ bevy_pancam = "0.11.1"
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = []
+
+[profile.release]
+debug = 1

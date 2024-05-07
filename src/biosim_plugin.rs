@@ -38,19 +38,26 @@ fn update_world(mut meshes: ResMut<Assets<Mesh>>, mut timer: ResMut<WorldTickTim
   if !timer.0.tick(time.delta()).just_finished() {
     return;
   }
+  let _true_update_world_span = info_span!("update_world_past_timer").entered();
 
   for (mut world_component, mesh_handle) in &mut query {
     let Some(mesh) = meshes.get_mut(mesh_handle.0.id()) else {
       break;
     };
 
+    let collection_span = info_span!("collection").entered();
     let cells: Vec<&Cell> = world_component.0.cells.iter().flat_map(|row| row.iter()).collect();
     let colors: Vec<[f32; 4]> = cells.iter().flat_map(|cell| 
       if **cell == Cell::Alive { arr![[0., 0., 0., 1.]; 6] } else { arr![[1., 1., 1., 1.]; 6] }
     ).collect();
+    collection_span.exit();
 
+    let attr_span = info_span!("inserting attribute").entered();
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+    attr_span.exit();
 
+    let tick_span = info_span!("ticking").entered();
     world_component.0 = world_component.0.tick();
+    tick_span.exit();
   }
 }
