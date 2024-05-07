@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use bevy::render::{color::Color, mesh::{Indices, Mesh, PrimitiveTopology}, render_asset::RenderAssetUsages};
 
-use crate::world::WORLD_WIDTH; // TODO: maybe rethink this organization
+use crate::world::WORLD_WIDTH;
 
 const NUM_VERTS_PER_HEX: u32 = 6;
 pub fn build_hex_grid_mesh() -> Mesh {
