@@ -25,7 +25,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     .insert(PanCam::default());
 
   commands.spawn(MaterialMesh2dBundle {
-    mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32, y: WORLD_WIDTH as f32 })).into(),
+    mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * 6.0, y: WORLD_WIDTH as f32 })).into(),
     material: materials.add(WorldMaterial { hexels: default() }),
     ..default()
   }).insert(WorldComponent(World::new_random()));
