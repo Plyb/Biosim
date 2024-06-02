@@ -5,7 +5,6 @@ use bevy::prelude::*;
 use biosim_plugin::BiosimPlugin;
 
 mod world;
-mod hex_grid;
 mod biosim_plugin;
 
 fn main() {

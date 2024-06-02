@@ -1,8 +1,7 @@
-use arr_macro::arr;
-use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{color::Color, mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}, texture::{self, ImageType}}, sprite::{ColorMaterial, Material2d, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle}, time::{Time, Timer, TimerMode}};
+use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
 
-use crate::{hex_grid::build_hex_grid_mesh, world::{Cell, World, WORLD_WIDTH}};
+use crate::world::{Cell, World, WORLD_WIDTH};
 use bevy::prelude::*;
 
 
@@ -66,18 +65,13 @@ fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut
     collection_span.exit();
 
     let image = Image::new(
-      Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 }, 
-      TextureDimension::D2, 
-      colors, 
-      TextureFormat::Rgba8Unorm, 
+      Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 },
+      TextureDimension::D2,
+      colors,
+      TextureFormat::Rgba8Unorm,
       RenderAssetUsages::RENDER_WORLD
     );
-
     world_material.hexels = images.add(image);
-
-    // let attr_span = info_span!("inserting attribute").entered();
-    // mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-    // attr_span.exit();
 
     let tick_span = info_span!("ticking").entered();
     world_component.0 = world_component.0.tick();

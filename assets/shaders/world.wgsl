@@ -37,28 +37,10 @@ fn fragment(
 
     let hexel_x: u32 = (column / 2) - row;
     let hexel_y: u32 = row * 2 + u32(select(1, 0, column % 2 == 0));
-    
-
-    // let hexel_u = 1.5 * u - 0.5 * v;
-    // let hexel_v = v;
-
-    // let x = 32 * (.75*u - 0.25*v);
-    // let y = 32 * (.25*u + 0.75*v);
-    // let z = x-y;
-
-    // // let axial_x = u32(round((floor(x-y)-floor(z-x))/3.0));
-    // // let axial_y = u32(round((floor(y-z)-floor(x-y))/3.0));
-    // // let axial_z = u32(round((floor(z-x)-floor(y-z))/3.0));
-
-    // let ix = round(z);
-    // let iy = round(y);
 
     if (hexel_x < 0 || hexel_x > u32(WORLD_WIDTH) || hexel_y < 0 || hexel_y > u32(WORLD_WIDTH)) {
         return vec4<f32>(0.0, 0.0, 0.0, 0.0);
     }
-
-    // return vec4<f32>(select(0.0, 1.0, hexel_x == 2), select(0.0, 1.0, hexel_y == 2) / WORLD_WIDTH, 0.0, 1.0);
-    // // return vec4<f32>(u, v, 0.0, 1.0);
 
     return textureSample(material_color_texture, material_color_sampler, vec2<f32>((f32(hexel_x) + 0.5) / WORLD_WIDTH, (f32(hexel_y) + 0.5) / WORLD_WIDTH));
 }
