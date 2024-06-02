@@ -4,12 +4,12 @@
 @group(2) @binding(1) var material_color_sampler: sampler;
 
 const sqrt_3 : f32 = 1.732050807568877;
-const WORLD_WIDTH : f32 = 32;
 
 @fragment
 fn fragment(
     mesh: VertexOutput,
 ) -> @location(0) vec4<f32> {
+    let WORLD_WIDTH = f32(textureDimensions(material_color_texture).x);
     let u = mesh.uv.x * 3.0;
     let v = 1.0 - mesh.uv.y;
 
