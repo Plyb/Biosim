@@ -4,6 +4,7 @@
 /biosim_rust/target/
 /biosim_rust/assets/rust-gpu/
 /biosim_rust/shader/spirt-passes/
+/biosim_rust/shader/target/
 /rust_gpu/target/
 /rust_gpu/spirt-passes/
 trace*.json

@@ -1,0 +1,3 @@
+This is structured weirdly so that we can get the benefits of bevy-rust-gpu. If editing in VSCode, you may want to open the `/biosim_rust/` and `/biosim_rust/shader` folders in separate windows. The shader crate won't have all of the rust-analyzer features, but it will at least have some, which is nice.
+
+From the `rust_gpu/crates/rust-gpu-builder` folder, you can run `cargo cargo run --release -- ../../../biosim_rust/shader ../../../biosim_rust/assets/rust-gpu/shader.rust-gpu.msgpack` to generate the shader information.
