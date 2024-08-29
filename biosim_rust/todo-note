@@ -1,0 +1,11 @@
+https://github.com/EmbarkStudios/rust-gpu/blob/main/docs/src/writing-shader-crates.md
+https://github.com/bevyengine/bevy/issues/5634
+https://github.com/bevy-rust-gpu
+
+I think we're going to need to do this in at least two separate workspaces unfortunately.
+Here is the plan, 3 projects
+1. library crate project that has the "kernel"
+2. bevy project that can read from (1) on the cpu in debug mode if needed, and can read the outputted file from (3) in gpu mode
+3. rust-gpu project that relies on (1) and outputs a compiled spirv file to (2)
+then, we'll create a bat file that runs them in the correct order.
+Note: we may be able to combine 1 and 2 into a single project, which would be great for tooling purposes.
