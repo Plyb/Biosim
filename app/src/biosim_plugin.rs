@@ -42,7 +42,7 @@ struct WorldMaterial {
 
 impl Material2d for WorldMaterial {
   fn fragment_shader() -> ShaderRef {
-      "shaders/world.wgsl".into()
+    env!("biosim_rust_shader.spv").into()
   }
 }
 

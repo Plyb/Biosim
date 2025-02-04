@@ -1,0 +1,15 @@
+[workspace]
+members = ["app", "shader"]
+resolver = "2"
+
+[patch.crates-io]
+spirv-builder = { path = "../rust-gpu/crates/spirv-builder"}
+
+# Compile build-dependencies in release mode with
+# the same settings as regular dependencies.
+# these settings come from https://rust-gpu.github.io/rust-gpu/book/writing-shader-crates.html
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 16
+[profile.dev.build-override]
+opt-level = 3
