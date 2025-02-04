@@ -9,3 +9,4 @@ crate-type = ["dylib"]
 [dependencies]
 spirv-std = { version = "0.9" }
 libm = "0.2"
+biosim-core = { path = "../biosim-core"}

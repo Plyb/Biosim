@@ -1,5 +1,5 @@
 [workspace]
-members = ["app", "shader"]
+members = ["app", "biosim-core", "shader"]
 resolver = "2"
 
 [patch.crates-io]

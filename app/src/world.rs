@@ -1,9 +1,8 @@
 use std::fmt::Debug;
+use biosim_core::WORLD_WIDTH;
 use rand::{Rng, distributions::{Standard, Distribution}};
 use serde::Serialize;
 use serde_big_array::Array;
-
-pub const WORLD_WIDTH: usize = 32;
 
 #[derive(PartialEq, Clone, Serialize)]
 pub enum Cell {

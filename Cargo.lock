@@ -1092,12 +1092,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "biosim-core"
+version = "0.1.0"
+
+[[package]]
 name = "biosim-rust"
 version = "0.1.0"
 dependencies = [
  "arr_macro",
  "bevy",
  "bevy_pancam",
+ "biosim-core",
  "rand",
  "serde",
  "serde-big-array",
@@ -1109,6 +1114,7 @@ dependencies = [
 name = "biosim-rust-shader"
 version = "0.1.0"
 dependencies = [
+ "biosim-core",
  "libm",
  "spirv-std",
 ]

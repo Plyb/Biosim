@@ -1,6 +1,7 @@
 #![allow(unexpected_cfgs)]
 #![cfg_attr(target_arch = "spirv", no_std)]
 
+use biosim_core::WORLD_WIDTH;
 use libm::floorf;
 use spirv_std::{glam::{vec2, vec4, Vec2, Vec3, Vec4}, image::Image2d, spirv, Sampler};
 
@@ -15,7 +16,7 @@ pub fn fragment(
   material_sampler: &Sampler,
   output: &mut Vec4
 ) {
-  let world_width = 32 as f32; // TODO
+  let world_width = WORLD_WIDTH as f32; // TODO
   let u = (uv.x * 3.0) as f32;
   let v = (1.0 - uv.y) as f32;
   
