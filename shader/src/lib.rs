@@ -44,7 +44,7 @@ pub fn fragment(
   let hexel_x: u32 = (column / 2) - row;
   let hexel_y: u32 = row * 2 + ((if column % 2 == 0 { 0 } else { 1 }) as u32);
 
-  if hexel_x < 0 || hexel_x > (world_width as u32) || hexel_y < 0 || hexel_y > (world_width as u32) {
+  if hexel_x > (world_width as u32) || hexel_y > (world_width as u32) {
     *output = vec4(0.0, 0.0, 0.0, 0.0);
 } else {
     let coords = vec2(((hexel_x as f32) + 0.5) / (world_width as f32), ((hexel_y as f32) + 0.5) / (world_width as f32));
