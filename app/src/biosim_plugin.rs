@@ -1,8 +1,8 @@
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
-use biosim_core::WORLD_WIDTH;
+use biosim_core::{world::Cell, WORLD_WIDTH};
 
-use crate::world::{Cell, World};
+use crate::world::World;
 use bevy::prelude::*;
 
 

@@ -1094,6 +1094,10 @@ dependencies = [
 [[package]]
 name = "biosim-core"
 version = "0.1.0"
+dependencies = [
+ "rand",
+ "serde",
+]
 
 [[package]]
 name = "biosim-rust"
@@ -1876,7 +1880,7 @@ dependencies = [
  "vec_map",
  "wasm-bindgen",
  "web-sys",
- "windows 0.52.0",
+ "windows 0.54.0",
 ]
 
 [[package]]

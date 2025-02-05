@@ -1,48 +1,8 @@
-use std::fmt::Debug;
-use biosim_core::WORLD_WIDTH;
-use rand::{Rng, distributions::{Standard, Distribution}};
+use biosim_core::{world::Cell, WORLD_WIDTH};
 use serde::Serialize;
 use serde_big_array::Array;
 
-#[derive(PartialEq, Clone, Serialize)]
-pub enum Cell {
-    Dead,
-    Alive,
-}
-
-impl Default for Cell {
-    fn default() -> Self {
-        Cell::Dead
-    }
-}
-
-impl Debug for Cell {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
-}
-
-impl Distribution<Cell> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Cell {
-        match rng.gen_range(0..=1) {
-            0 => Cell::Dead,
-            _ => Cell::Alive,
-        }
-    }
-}
-
-impl Copy for Cell {}
-
-impl ToString for Cell {
-    fn to_string(&self) -> String {
-        match self {
-            Cell::Alive => "#".into(),
-            Cell::Dead => "-".into(),
-        }
-    }
-}
-
-#[derive(Default, Serialize, Clone)]
+#[derive(Default, Serialize, Clone, Debug)]
 pub struct World {
     pub cells: Vec<Array<Cell, WORLD_WIDTH>>}
 
@@ -107,17 +67,5 @@ impl World {
         } else {
             self.cells[x as usize][y as usize].clone()
         }
-    }
-}
-
-impl Debug for World {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = self.cells.iter().map(|row| {
-            row.map(|cell| {
-                cell.to_string()
-            }).join("")
-        }).collect::<Vec<_>>().join("\n");
-
-        write!(f, "{}", string)
     }
 }

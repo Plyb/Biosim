@@ -16,7 +16,7 @@ pub fn fragment(
   material_sampler: &Sampler,
   output: &mut Vec4
 ) {
-  let world_width = WORLD_WIDTH as f32; // TODO
+  let world_width = WORLD_WIDTH as f32;
   let u = (uv.x * 3.0) as f32;
   let v = (1.0 - uv.y) as f32;
   
