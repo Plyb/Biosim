@@ -3,7 +3,7 @@
 
 use biosim_core::WORLD_WIDTH;
 use libm::floorf;
-use spirv_std::{glam::{vec2, vec4, Vec2, Vec3, Vec4}, image::Image2d, spirv, Sampler};
+use spirv_std::{glam::{vec2, vec4, UVec3, Vec2, Vec3, Vec4}, image::Image2d, spirv, Sampler};
 
 #[spirv(fragment)]
 pub fn fragment(
@@ -50,5 +50,16 @@ pub fn fragment(
 } else {
     let coords = vec2(((hexel_x as f32) + 0.5) / (world_width as f32), ((hexel_y as f32) + 0.5) / (world_width as f32));
     *output = material_color_texture.sample(*material_sampler, coords)
+  }
+}
+
+#[spirv(compute(threads(4)))]
+pub fn main(
+  #[spirv(global_invocation_id)] global_id: UVec3,
+  #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] buf: &mut [f32],
+) {
+  let idx = global_id.x as usize;
+  if idx < buf.len() {
+    buf[idx] = buf[idx] * 2.0;
   }
 }
