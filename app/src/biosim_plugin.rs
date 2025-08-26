@@ -87,6 +87,6 @@ fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut
     tick_span.exit();
 
     last_output.0 = compute_shader.dispatch(&last_output.0);
-    println!("Result: {:?}", compute_shader.dispatch(&last_output.0));
+    println!("Result: {:?}", last_output.0);
   }
 }
