@@ -21,6 +21,9 @@ impl Plugin for BiosimPlugin {
 #[derive(Resource)]
 struct WorldTickTimer(Timer);
 
+#[derive(Resource)]
+struct ListHolder(Vec<f32>);
+
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>) {
   commands.spawn(Camera2dBundle::default())
     .insert(PanCam::default());
@@ -31,9 +34,9 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     ..default()
   }).insert(WorldComponent(World::new_random()));
 
-  let mut compute_shader = BiosimComputeShader::new(4);
-  compute_shader.dispatch(&[1.0, 2.0, 3.0, 4.0]);
+  let compute_shader = BiosimComputeShader::new(4);
   commands.insert_resource(compute_shader);
+  commands.insert_resource(ListHolder(vec![1.0, 2.0, 3.0, 4.0]));
 } 
 
 #[derive(Component)]
@@ -52,7 +55,7 @@ impl Material2d for WorldMaterial {
   }
 }
 
-fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut<Assets<Image>>, mut timer: ResMut<WorldTickTimer>, time: Res<Time>, mut query: Query<(&mut WorldComponent, &mut Handle<WorldMaterial>)>, mut compute_shader: ResMut<BiosimComputeShader>) {
+fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut<Assets<Image>>, mut timer: ResMut<WorldTickTimer>, time: Res<Time>, mut query: Query<(&mut WorldComponent, &mut Handle<WorldMaterial>)>, compute_shader: Res<BiosimComputeShader>, mut last_output: ResMut<ListHolder>) {
   if !timer.0.tick(time.delta()).just_finished() {
     return;
   }
@@ -83,7 +86,7 @@ fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut
     world_component.0 = world_component.0.tick();
     tick_span.exit();
 
-    let last_output = compute_shader.last_output.clone();
-    println!("Result: {:?}", compute_shader.dispatch(&last_output));
+    last_output.0 = compute_shader.dispatch(&last_output.0);
+    println!("Result: {:?}", compute_shader.dispatch(&last_output.0));
   }
 }

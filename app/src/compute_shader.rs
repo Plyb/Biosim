@@ -11,11 +11,10 @@ pub struct BiosimComputeShader {
   descriptor_set: Arc<PersistentDescriptorSet>,
   buffer_allocator: StandardCommandBufferAllocator,
   buffer: Arc<CpuAccessibleBuffer<[f32]>>, // Note that this means we have a fixed sized for our buffer. If we want variable size, we'd need to rebuild the buffer each time.
-  pub last_output: Vec<f32>
 }
 
 impl BiosimComputeShader {
-  pub fn dispatch(&mut self, input: &[f32]) -> Vec<f32> {
+  pub fn dispatch(&self, input: &[f32]) -> Vec<f32> {
     let length = input.len() as u32;
 
     self.copy_to_buffer(input);
@@ -39,7 +38,6 @@ impl BiosimComputeShader {
     future.wait(None).unwrap();
 
     let content = self.buffer.read().unwrap().to_vec();
-    self.last_output = content.clone();
     content
   }
 
@@ -138,7 +136,7 @@ impl BiosimComputeShader {
       )])}.unwrap();
 
     let data = vec![0.0f32; buffer_length];
-    let data_iter = data.clone().into_iter();
+    let data_iter = data.into_iter();
 
     let memory_allocator = StandardMemoryAllocator::new_default(device.clone());
     let buffer = CpuAccessibleBuffer::from_iter(
@@ -158,6 +156,6 @@ impl BiosimComputeShader {
     ).unwrap();
 
     let buffer_allocator = StandardCommandBufferAllocator::new(device.clone(), Default::default());
-    BiosimComputeShader { device, queue, pipeline, descriptor_set, buffer_allocator, buffer, last_output: data }
+    BiosimComputeShader { device, queue, pipeline, descriptor_set, buffer_allocator, buffer }
   }
 }
