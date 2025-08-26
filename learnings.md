@@ -1,3 +1,7 @@
+# 2025-08-26
+
+1. My current GPU (2060 Super) maxes out at 1024 work group invocations, so trying to do more threads than 32x32 causes device loss (leading to a panic in bevy)
+
 # 2025-02-03
 
 1. Bevy seems to expect the vertex and fragment shader entry points to be specifically named "vertex" and "fragment" respectively
