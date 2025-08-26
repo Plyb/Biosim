@@ -10,7 +10,8 @@ pub struct BiosimComputeShader {
   pipeline: Arc<ComputePipeline>,
   descriptor_set: Arc<PersistentDescriptorSet>,
   buffer_allocator: StandardCommandBufferAllocator,
-  buffer: Arc<CpuAccessibleBuffer<[f32]>>, // Note that this means we have a fixed sized for our buffer. If we want variable size, we'd need to rebuild the buffer each time.
+  input_buffer: Arc<CpuAccessibleBuffer<[f32]>>, // Note that this means we have a fixed sized for our buffer. If we want variable size, we'd need to rebuild the buffer each time.
+  output_buffer: Arc<CpuAccessibleBuffer<[f32]>>,
 }
 
 impl BiosimComputeShader {
@@ -37,12 +38,12 @@ impl BiosimComputeShader {
 
     future.wait(None).unwrap();
 
-    let content = self.buffer.read().unwrap().to_vec();
+    let content = self.output_buffer.read().unwrap().to_vec();
     content
   }
 
   fn copy_to_buffer(&self, input: &[f32]) {
-    let mut content = self.buffer.write().unwrap();
+    let mut content = self.input_buffer.write().unwrap();
     for (src, dst) in input.iter().zip(content.iter_mut()) {
       *dst = *src;
     }
@@ -118,16 +119,28 @@ impl BiosimComputeShader {
         ExecutionModel::GLCompute,
         EntryPointInfo {
           execution: ShaderExecution::Compute, 
-          descriptor_requirements: [(
-            (0u32, 0u32), 
-            DescriptorRequirements {
-              descriptor_types: vec![DescriptorType:: StorageBuffer, DescriptorType :: StorageBufferDynamic],
-              descriptor_count: Some(1u32),
-              stages: ShaderStages { compute: true, ..Default::default() },
-              storage_write: [0u32].into_iter().collect(),
-              ..Default::default()
-            }
-          )].into_iter().collect(),
+          descriptor_requirements: [
+            (
+              (0u32, 0u32), 
+              DescriptorRequirements {
+                descriptor_types: vec![DescriptorType:: StorageBuffer, DescriptorType :: StorageBufferDynamic],
+                descriptor_count: Some(1u32),
+                stages: ShaderStages { compute: true, ..Default::default() },
+                storage_write: [0u32].into_iter().collect(),
+                ..Default::default()
+              }
+            ),
+            (
+              (0u32, 1u32), 
+              DescriptorRequirements {
+                descriptor_types: vec![DescriptorType:: StorageBuffer, DescriptorType :: StorageBufferDynamic],
+                descriptor_count: Some(1u32),
+                stages: ShaderStages { compute: true, ..Default::default() },
+                storage_write: [1u32].into_iter().collect(),
+                ..Default::default()
+              }
+            ),
+          ].into_iter().collect(),
           push_constant_requirements: None,
           specialization_constant_requirements: [].into_iter().collect(),
           input_interface: ShaderInterface::new_unchecked(vec! []),
@@ -135,15 +148,18 @@ impl BiosimComputeShader {
         }
       )])}.unwrap();
 
-    let data = vec![0.0f32; buffer_length];
-    let data_iter = data.into_iter();
-
     let memory_allocator = StandardMemoryAllocator::new_default(device.clone());
-    let buffer = CpuAccessibleBuffer::from_iter(
+    let input_buffer = CpuAccessibleBuffer::from_iter(
       &memory_allocator, 
       BufferUsage { storage_buffer: true, ..Default::default() }, 
       false, 
-      data_iter
+      vec![0.0f32; buffer_length],
+    ).unwrap();
+    let output_buffer = CpuAccessibleBuffer::from_iter(
+      &memory_allocator, 
+      BufferUsage { storage_buffer: true, ..Default::default() }, 
+      false, 
+      vec![0.0f32; buffer_length]
     ).unwrap();
 
     let pipeline = ComputePipeline::new(device.clone(), shader.entry_point("main").unwrap(), &(), None, |_| {}).unwrap();
@@ -152,10 +168,10 @@ impl BiosimComputeShader {
     let descriptor_set = PersistentDescriptorSet::new(
       &descriptor_set_allocator,
       layout.clone(),
-      [WriteDescriptorSet::buffer(0, buffer.clone())],
+      [WriteDescriptorSet::buffer(0, input_buffer.clone()), WriteDescriptorSet::buffer(1, output_buffer.clone())],
     ).unwrap();
 
     let buffer_allocator = StandardCommandBufferAllocator::new(device.clone(), Default::default());
-    BiosimComputeShader { device, queue, pipeline, descriptor_set, buffer_allocator, buffer }
+    BiosimComputeShader { device, queue, pipeline, descriptor_set, buffer_allocator, input_buffer, output_buffer }
   }
 }

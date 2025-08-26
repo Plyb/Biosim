@@ -1,9 +1,9 @@
 #![allow(unexpected_cfgs)]
 #![cfg_attr(target_arch = "spirv", no_std)]
 
-use biosim_core::WORLD_WIDTH;
+use biosim_core::{world::Cell, WORLD_WIDTH};
 use libm::floorf;
-use spirv_std::{glam::{vec2, vec4, UVec3, Vec2, Vec3, Vec4}, image::Image2d, spirv, Sampler};
+use spirv_std::{glam::{vec2, vec4, UVec3, Vec2, Vec3, Vec4, IVec3}, image::Image2d, spirv, Sampler};
 
 #[spirv(fragment)]
 pub fn fragment(
@@ -56,10 +56,68 @@ pub fn fragment(
 #[spirv(compute(threads(4)))]
 pub fn main(
   #[spirv(global_invocation_id)] global_id: UVec3,
-  #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] buf: &mut [f32],
+  #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] input: &[f32],
+  #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [f32],
 ) {
-  let idx = global_id.x as usize;
-  if idx < buf.len() {
-    buf[idx] = buf[idx] * 2.0;
+  let idx = get_index(global_id);
+  if idx < input.len() {
+    // update_cell(input, output, global_id);
+    output[idx] = input[idx] * 2.0;
   }
 }
+
+fn get_index(global_id: UVec3) -> usize {
+  let x = global_id.x as usize;
+  let y = global_id.y as usize;
+  y * WORLD_WIDTH + x
+}
+
+// fn update_cell(input: &[Cell], output: &mut [Cell], global_id: UVec3) {
+//   let new_state = get_new_state(input, global_id);
+//   set_cell_at(output, global_id, new_state);
+// }
+
+// fn set_cell_at(buf: &mut [Cell], global_id: UVec3, cell: Cell) {
+//   buf[get_index(global_id)] = cell;
+// }
+
+// fn icell_at(buf: &[Cell], global_id: IVec3) -> Cell {
+//   if global_id.x < 0 || global_id.y < 0 {
+//     Cell::Dead
+//   } else {
+//     cell_at(buf, global_id.as_uvec3())
+//   }
+// }
+
+// fn cell_at(buf: &[Cell], global_id: UVec3) -> Cell {
+//   buf[get_index(global_id)]
+// }
+
+// fn get_new_state(buf: &[Cell], global_id: UVec3) -> Cell {
+//   match cell_at(buf, global_id) {
+//     Cell::Alive => {
+//       match count_living_neighbors(buf, global_id) {
+//         2..=3 => Cell::Alive,
+//         _ => Cell::Dead,
+//       }
+//     }
+//     Cell::Dead => {
+//       match count_living_neighbors(buf, global_id) {
+//         3 => Cell::Alive,
+//         _ => Cell::Dead,
+//       }
+//     }
+//   } 
+// }
+
+// fn count_living_neighbors(buf: &[Cell], global_id: UVec3) -> i32 {
+//   let mut num_living_neighbors = 0;
+//   for x1 in -1..=1 {
+//     for y1 in -1..=1 {
+//       if icell_at(buf, global_id.as_ivec3() + IVec3::new(x1, y1, 0)) == Cell::Alive && !(x1 == 0 && y1 == 0) {
+//         num_living_neighbors += 1;
+//       }
+//     }
+//   }
+//   num_living_neighbors
+// }
