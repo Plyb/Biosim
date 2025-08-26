@@ -2,7 +2,7 @@ use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::co
 use bevy_pancam::{PanCam, PanCamPlugin};
 use biosim_core::{world::Cell, WORLD_WIDTH};
 
-use crate::world::World;
+use crate::world::new_random;
 use crate::compute_shader::BiosimComputeShader;
 use bevy::prelude::*;
 
@@ -21,9 +21,6 @@ impl Plugin for BiosimPlugin {
 #[derive(Resource)]
 struct WorldTickTimer(Timer);
 
-#[derive(Resource)]
-struct ListHolder(Vec<f32>);
-
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>) {
   commands.spawn(Camera2dBundle::default())
     .insert(PanCam::default());
@@ -32,15 +29,14 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * 6.0, y: WORLD_WIDTH as f32 })).into(),
     material: materials.add(WorldMaterial { hexels: default() }),
     ..default()
-  }).insert(WorldComponent(World::new_random()));
+  }).insert(WorldComponent(new_random()));
 
-  let compute_shader = BiosimComputeShader::new(4);
+  let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH);
   commands.insert_resource(compute_shader);
-  commands.insert_resource(ListHolder(vec![1.0, 2.0, 3.0, 4.0]));
 } 
 
 #[derive(Component)]
-struct WorldComponent(World);
+struct WorldComponent(Vec<Cell>);
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct WorldMaterial {
@@ -55,7 +51,14 @@ impl Material2d for WorldMaterial {
   }
 }
 
-fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut<Assets<Image>>, mut timer: ResMut<WorldTickTimer>, time: Res<Time>, mut query: Query<(&mut WorldComponent, &mut Handle<WorldMaterial>)>, compute_shader: Res<BiosimComputeShader>, mut last_output: ResMut<ListHolder>) {
+fn update_world(
+  mut materials: ResMut<Assets<WorldMaterial>>,
+  mut images: ResMut<Assets<Image>>,
+  mut timer: ResMut<WorldTickTimer>,
+  time: Res<Time>,
+  mut query: Query<(&mut WorldComponent,&mut Handle<WorldMaterial>)>,
+  compute_shader: Res<BiosimComputeShader>
+) {
   if !timer.0.tick(time.delta()).just_finished() {
     return;
   }
@@ -67,9 +70,9 @@ fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut
     };
 
     let collection_span = info_span!("collection").entered();
-    let cells: Vec<&Cell> = world_component.0.cells.iter().flat_map(|row| row.iter()).collect();
+    let cells: &Vec<Cell> = &world_component.0;
     let colors: Vec<u8> = cells.iter().flat_map(|cell| 
-      if **cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }
+      if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }
     ).collect();
     collection_span.exit();
 
@@ -83,10 +86,10 @@ fn update_world(mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut
     world_material.hexels = images.add(image);
 
     let tick_span = info_span!("ticking").entered();
-    world_component.0 = world_component.0.tick();
+    // world_component.0 = tick(&world_component.0);
     tick_span.exit();
 
-    last_output.0 = compute_shader.dispatch(&last_output.0);
-    println!("Result: {:?}", last_output.0);
+    world_component.0 = compute_shader.dispatch(&cells);
+    // println!("Result: {:?}", last_output.0);
   }
 }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use bevy::ecs::system::Resource;
+use biosim_core::{world::Cell, WORLD_WIDTH};
 use vulkano::{buffer::{BufferUsage, CpuAccessibleBuffer}, command_buffer::{allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage}, descriptor_set::{allocator::StandardDescriptorSetAllocator, layout::DescriptorType, PersistentDescriptorSet, WriteDescriptorSet}, device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags}, instance::{Instance, InstanceCreateInfo}, memory::allocator::StandardMemoryAllocator, pipeline::{ComputePipeline, Pipeline, PipelineBindPoint}, shader::{spirv::{Capability, ExecutionModel}, DescriptorRequirements, EntryPointInfo, ShaderExecution, ShaderInterface, ShaderModule, ShaderStages}, sync::{self, GpuFuture}, Version, VulkanLibrary};
 
 #[derive(Resource)]
@@ -10,14 +11,12 @@ pub struct BiosimComputeShader {
   pipeline: Arc<ComputePipeline>,
   descriptor_set: Arc<PersistentDescriptorSet>,
   buffer_allocator: StandardCommandBufferAllocator,
-  input_buffer: Arc<CpuAccessibleBuffer<[f32]>>, // Note that this means we have a fixed sized for our buffer. If we want variable size, we'd need to rebuild the buffer each time.
-  output_buffer: Arc<CpuAccessibleBuffer<[f32]>>,
+  input_buffer: Arc<CpuAccessibleBuffer<[Cell]>>, // Note that this means we have a fixed sized for our buffer. If we want variable size, we'd need to rebuild the buffer each time.
+  output_buffer: Arc<CpuAccessibleBuffer<[Cell]>>,
 }
 
 impl BiosimComputeShader {
-  pub fn dispatch(&self, input: &[f32]) -> Vec<f32> {
-    let length = input.len() as u32;
-
+  pub fn dispatch(&self, input: &Vec<Cell>) -> Vec<Cell> {
     self.copy_to_buffer(input);
 
     let mut builder = AutoCommandBufferBuilder::primary(
@@ -27,7 +26,7 @@ impl BiosimComputeShader {
       ).unwrap();
     builder.bind_pipeline_compute(self.pipeline.clone())
       .bind_descriptor_sets(PipelineBindPoint::Compute, self.pipeline.layout().clone(), 0, self.descriptor_set.clone())
-      .dispatch([length, 1, 1])
+      .dispatch([WORLD_WIDTH as u32, WORLD_WIDTH as u32, 1])
       .unwrap();
 
     let command_buffer = builder.build().unwrap();
@@ -42,7 +41,7 @@ impl BiosimComputeShader {
     content
   }
 
-  fn copy_to_buffer(&self, input: &[f32]) {
+  fn copy_to_buffer(&self, input: &[Cell]) {
     let mut content = self.input_buffer.write().unwrap();
     for (src, dst) in input.iter().zip(content.iter_mut()) {
       *dst = *src;
@@ -153,13 +152,13 @@ impl BiosimComputeShader {
       &memory_allocator, 
       BufferUsage { storage_buffer: true, ..Default::default() }, 
       false, 
-      vec![0.0f32; buffer_length],
+      vec![Cell::Dead; buffer_length],
     ).unwrap();
     let output_buffer = CpuAccessibleBuffer::from_iter(
       &memory_allocator, 
       BufferUsage { storage_buffer: true, ..Default::default() }, 
       false, 
-      vec![0.0f32; buffer_length]
+      vec![Cell::Dead; buffer_length]
     ).unwrap();
 
     let pipeline = ComputePipeline::new(device.clone(), shader.entry_point("main").unwrap(), &(), None, |_| {}).unwrap();

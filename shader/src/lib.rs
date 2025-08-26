@@ -16,6 +16,15 @@ pub fn fragment(
   material_sampler: &Sampler,
   output: &mut Vec4
 ) {
+  hex_grid(uv, material_color_texture, material_sampler, output);
+}
+
+fn rect_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampler, output: &mut Vec4) {
+  let world_width = WORLD_WIDTH as f32;
+  *output = material_color_texture.sample(*material_sampler, ((uv * world_width).floor() + 0.5) / world_width)
+}
+
+fn hex_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampler, output: &mut Vec4) {
   let world_width = WORLD_WIDTH as f32;
   let u = (uv.x * 3.0) as f32;
   let v = (1.0 - uv.y) as f32;
@@ -47,22 +56,21 @@ pub fn fragment(
 
   if hexel_x > (world_width as u32) || hexel_y > (world_width as u32) {
     *output = vec4(0.0, 0.0, 0.0, 0.0);
-} else {
+  } else {
     let coords = vec2(((hexel_x as f32) + 0.5) / (world_width as f32), ((hexel_y as f32) + 0.5) / (world_width as f32));
     *output = material_color_texture.sample(*material_sampler, coords)
   }
 }
 
-#[spirv(compute(threads(4)))]
+#[spirv(compute(threads(32, 32)))] // TODO: Constantize
 pub fn main(
   #[spirv(global_invocation_id)] global_id: UVec3,
-  #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] input: &[f32],
-  #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [f32],
+  #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] input: &[Cell],
+  #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [Cell],
 ) {
   let idx = get_index(global_id);
   if idx < input.len() {
-    // update_cell(input, output, global_id);
-    output[idx] = input[idx] * 2.0;
+    update_cell(input, output, global_id);
   }
 }
 
@@ -72,52 +80,53 @@ fn get_index(global_id: UVec3) -> usize {
   y * WORLD_WIDTH + x
 }
 
-// fn update_cell(input: &[Cell], output: &mut [Cell], global_id: UVec3) {
-//   let new_state = get_new_state(input, global_id);
-//   set_cell_at(output, global_id, new_state);
-// }
+fn update_cell(input: &[Cell], output: &mut [Cell], global_id: UVec3) {
+  let new_state = get_new_state(input, global_id);
+  set_cell_at(output, global_id, new_state);
+}
 
-// fn set_cell_at(buf: &mut [Cell], global_id: UVec3, cell: Cell) {
-//   buf[get_index(global_id)] = cell;
-// }
+fn set_cell_at(buf: &mut [Cell], global_id: UVec3, cell: Cell) {
+  buf[get_index(global_id)] = cell;
+}
 
-// fn icell_at(buf: &[Cell], global_id: IVec3) -> Cell {
-//   if global_id.x < 0 || global_id.y < 0 {
-//     Cell::Dead
-//   } else {
-//     cell_at(buf, global_id.as_uvec3())
-//   }
-// }
+fn icell_at(buf: &[Cell], global_id: IVec3) -> Cell {
+  if global_id.x < 0 || global_id.y < 0 {
+    Cell::Dead
+  } else {
+    cell_at(buf, global_id.as_uvec3())
+  }
+}
 
-// fn cell_at(buf: &[Cell], global_id: UVec3) -> Cell {
-//   buf[get_index(global_id)]
-// }
+fn cell_at(buf: &[Cell], global_id: UVec3) -> Cell {
+  buf[get_index(global_id)]
+}
 
-// fn get_new_state(buf: &[Cell], global_id: UVec3) -> Cell {
-//   match cell_at(buf, global_id) {
-//     Cell::Alive => {
-//       match count_living_neighbors(buf, global_id) {
-//         2..=3 => Cell::Alive,
-//         _ => Cell::Dead,
-//       }
-//     }
-//     Cell::Dead => {
-//       match count_living_neighbors(buf, global_id) {
-//         3 => Cell::Alive,
-//         _ => Cell::Dead,
-//       }
-//     }
-//   } 
-// }
+fn get_new_state(buf: &[Cell], global_id: UVec3) -> Cell {
+  match cell_at(buf, global_id) {
+    Cell::Alive => {
+      match count_living_neighbors(buf, global_id) {
+        2..=3 => Cell::Alive,
+        _ => Cell::Dead,
+      }
+    }
+    Cell::Dead => {
+      match count_living_neighbors(buf, global_id) {
+        3 => Cell::Alive,
+        _ => Cell::Dead,
+      }
+    }
+    Cell::Blah => Cell::Alive
+  } 
+}
 
-// fn count_living_neighbors(buf: &[Cell], global_id: UVec3) -> i32 {
-//   let mut num_living_neighbors = 0;
-//   for x1 in -1..=1 {
-//     for y1 in -1..=1 {
-//       if icell_at(buf, global_id.as_ivec3() + IVec3::new(x1, y1, 0)) == Cell::Alive && !(x1 == 0 && y1 == 0) {
-//         num_living_neighbors += 1;
-//       }
-//     }
-//   }
-//   num_living_neighbors
-// }
+fn count_living_neighbors(buf: &[Cell], global_id: UVec3) -> i32 {
+  let mut num_living_neighbors = 0;
+  for x1 in -1..=1 {
+    for y1 in -1..=1 {
+      if icell_at(buf, global_id.as_ivec3() + IVec3::new(x1, y1, 0)) == Cell::Alive && !(x1 == 0 && y1 == 0) {
+        num_living_neighbors += 1;
+      }
+    }
+  }
+  num_living_neighbors
+}

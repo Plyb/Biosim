@@ -1,10 +1,23 @@
+use bytemuck::{Pod, Zeroable};
 use rand::{distributions::{Distribution, Standard}, Rng};
 use serde::Serialize;
 
+#[repr(u32)] // TODO: try shrinking this
 #[derive(PartialEq, Clone, Serialize, Debug)]
 pub enum Cell {
-  Dead,
-  Alive,
+  Dead = 0,
+  Alive = 1,
+  Blah = 3 // TODO: temporary. For some reason rust-gpu gets testy if you have a "bool" in an entry point
+}
+
+unsafe impl Zeroable for Cell {
+  fn zeroed() -> Self {
+    Cell::Dead
+  }
+}
+
+unsafe impl Pod for Cell {
+  
 }
 
 impl Default for Cell {
