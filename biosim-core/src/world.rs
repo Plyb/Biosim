@@ -2,7 +2,7 @@ use bytemuck::{Pod, Zeroable};
 use rand::{distributions::{Distribution, Standard}, Rng};
 use serde::Serialize;
 
-#[repr(u32)] // TODO: try shrinking this
+#[repr(u32)]
 #[derive(PartialEq, Clone, Serialize, Debug)]
 pub enum Cell {
   Dead = 0,
