@@ -6,6 +6,7 @@ use biosim_plugin::BiosimPlugin;
 
 mod world;
 mod biosim_plugin;
+mod compute_shader;
 
 fn main() {
   App::new()
