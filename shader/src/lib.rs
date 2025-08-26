@@ -1,7 +1,7 @@
 #![allow(unexpected_cfgs)]
 #![cfg_attr(target_arch = "spirv", no_std)]
 
-use biosim_core::{world::{get_index, Cell, WorldCursor}, WORLD_WIDTH};
+use biosim_core::{world::{get_index, Cell, WorldCoord, WorldCursor}, WORLD_WIDTH};
 use libm::floorf;
 use spirv_std::{glam::{vec2, vec4, UVec3, Vec2, Vec3, Vec4, IVec3}, image::Image2d, spirv, Sampler};
 
@@ -68,23 +68,20 @@ pub fn main(
   #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] input: &[Cell; WORLD_WIDTH * WORLD_WIDTH],
   #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [Cell],
 ) {
-  let idx = get_index(global_id.x as usize, global_id.y as usize);
+  let coord = WorldCoord { x: global_id.x as usize, y: global_id.y as usize };
+  let idx = get_index(coord);
   if idx < input.len() {
-    update_cell(input, output, global_id);
+    update_cell(input, output, coord);
   }
 }
 
-fn update_cell(input: &[Cell; WORLD_WIDTH * WORLD_WIDTH], output: &mut [Cell], global_id: UVec3) {
-  let cursor = WorldCursor::new(
-      input,
-      global_id.x as usize,
-      global_id.y as usize
-  );
+fn update_cell(input: &[Cell; WORLD_WIDTH * WORLD_WIDTH], output: &mut [Cell], coord: WorldCoord) {
+  let cursor = WorldCursor::new(input, coord);
   
   let new_state = cursor.get_new_state();
-  set_cell_at(output, global_id, new_state);
+  set_cell_at(output, coord, new_state);
 }
 
-fn set_cell_at(buf: &mut [Cell], global_id: UVec3, cell: Cell) {
-  buf[get_index(global_id.x as usize, global_id.y as usize)] = cell;
+fn set_cell_at(buf: &mut [Cell], coord: WorldCoord, cell: Cell) {
+  buf[get_index(coord)] = cell;
 }

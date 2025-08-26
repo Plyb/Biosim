@@ -1,3 +1,5 @@
+use core::ops;
+
 use bytemuck::{Pod, Zeroable};
 use rand::{distributions::{Distribution, Standard}, Rng};
 use serde::Serialize;
@@ -38,15 +40,45 @@ impl Distribution<Cell> for Standard {
 
 impl Copy for Cell {}
 
+#[derive(Copy, Clone)]
+pub struct WorldCoord {
+  pub x: usize,
+  pub y: usize,
+}
+
+pub struct WorldOffset {
+  pub x: i32,
+  pub y: i32,
+}
+
+impl ops::Add<WorldOffset> for WorldCoord {
+    type Output = Option<WorldCoord>;
+
+    fn add(self, rhs: WorldOffset) -> Self::Output {
+      let x = self.x as i32 + rhs.x;
+      let y = self.y as i32 + rhs.y;
+      if x < 0 || y < 0 || x as usize >= WORLD_WIDTH || y as usize >= WORLD_WIDTH {
+        None
+      } else {
+        Some(WorldCoord { x: x as usize, y: y as usize })
+      }
+    }
+}
+
+impl WorldOffset {
+  fn zero() -> WorldOffset {
+    WorldOffset { x: 0, y: 0 }
+  }
+}
+
 pub struct WorldCursor<'a> {
-  x: usize,
-  y: usize,
-  cells: &'a [Cell; WORLD_WIDTH * WORLD_WIDTH]
+  coord: WorldCoord,
+  cells: &'a [Cell; WORLD_WIDTH * WORLD_WIDTH],
 }
 
 impl<'a> WorldCursor<'a> {
-  pub fn new(cells: &'a [Cell; WORLD_WIDTH * WORLD_WIDTH], x: usize, y: usize) -> WorldCursor<'a> {
-    WorldCursor { x, y, cells }
+  pub fn new(cells: &'a [Cell; WORLD_WIDTH * WORLD_WIDTH], coord: WorldCoord) -> WorldCursor<'a> {
+    WorldCursor { coord, cells }
   }
 
   pub fn get_new_state(&self) -> Cell {
@@ -66,35 +98,28 @@ impl<'a> WorldCursor<'a> {
     } 
   }
 
-  fn get_cell_at(&self, x_offset: i32, y_offset: i32) -> Cell {
-        if self.is_valid_offset(x_offset, y_offset) {
-          self.get_cell_at_raw(x_offset, y_offset)
-        } else {
-          Cell::Dead
-        }
+  fn get_cell_at_offset(&self, offset: WorldOffset) -> Cell {
+      match self.coord + offset {
+        Some(coord) => self.get_cell_at_coord(coord),
+        None => Cell::Dead
+      }
     }
   
-  fn get_cell_at_raw(&self, x_offset: i32, y_offset: i32) -> Cell {
+  fn get_cell_at_coord(&self, coord: WorldCoord) -> Cell {
     self.cells[
-        get_index((self.x as i32 + x_offset) as usize, (self.y as i32 + y_offset) as usize)
+        get_index(coord)
       ]
   }
 
   fn get_cell(&self) -> Cell {
-    self.get_cell_at(0, 0)
-  }
-
-  fn is_valid_offset(&self, x_offset: i32, y_offset: i32) -> bool {
-    let x = self.x as i32 + x_offset;
-    let y = self.y as i32 + y_offset;
-    !(x < 0 || y < 0 || x as usize >= WORLD_WIDTH || y as usize >= WORLD_WIDTH)
+    self.get_cell_at_offset(WorldOffset::zero())
   }
 
   fn count_living_neighbors(&self) -> i32 {
     let mut num_living_neighbors = 0;
-    for x1 in -1..=1 {
-      for y1 in -1..=1 {
-        if self.get_cell_at(x1, y1) == Cell::Alive && !(x1 == 0 && y1 == 0) {
+    for x in -1..=1 {
+      for y in -1..=1 {
+        if self.get_cell_at_offset(WorldOffset { x, y }) == Cell::Alive && !(x == 0 && y == 0) {
           num_living_neighbors += 1;
         }
       }
@@ -103,7 +128,7 @@ impl<'a> WorldCursor<'a> {
   }
 }
 
-pub fn get_index(x: usize, y: usize) -> usize {
-  y * WORLD_WIDTH + x
+pub fn get_index(coord: WorldCoord) -> usize {
+  coord.y * WORLD_WIDTH + coord.x
 }
 
