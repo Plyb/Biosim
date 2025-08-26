@@ -38,7 +38,6 @@ fn get_new_state(cells: &Vec<Cell>, x: usize, y: usize) -> Cell {
         _ => Cell::Dead,
       }
     }
-    Cell::Blah => Cell::Alive
   } 
 }
 

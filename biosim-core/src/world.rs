@@ -7,7 +7,6 @@ use serde::Serialize;
 pub enum Cell {
   Dead = 0,
   Alive = 1,
-  Blah = 3 // TODO: temporary. For some reason rust-gpu gets testy if you have a "bool" in an entry point
 }
 
 unsafe impl Zeroable for Cell {

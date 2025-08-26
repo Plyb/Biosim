@@ -115,7 +115,6 @@ fn get_new_state(buf: &[Cell], global_id: UVec3) -> Cell {
         _ => Cell::Dead,
       }
     }
-    Cell::Blah => Cell::Alive
   } 
 }
 
