@@ -62,7 +62,7 @@ fn hex_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampl
   }
 }
 
-#[spirv(compute(threads(32, 32)))] // TODO: Constantize
+#[spirv(compute(threads(32, 32)))]
 pub fn main(
   #[spirv(global_invocation_id)] global_id: UVec3,
   #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] input: &[Cell],
