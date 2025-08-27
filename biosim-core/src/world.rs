@@ -6,6 +6,8 @@ use serde::Serialize;
 
 use crate::WORLD_WIDTH;
 
+use crate::util::DOption;
+
 #[repr(u32)]
 #[derive(PartialEq, Clone, Serialize, Debug)]
 pub enum Cell {
@@ -40,7 +42,7 @@ impl Distribution<Cell> for Standard {
 
 impl Copy for Cell {}
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct WorldCoord {
   pub x: usize,
   pub y: usize,
@@ -52,15 +54,15 @@ pub struct WorldOffset {
 }
 
 impl ops::Add<WorldOffset> for WorldCoord {
-    type Output = Option<WorldCoord>;
+    type Output = DOption<WorldCoord>;
 
     fn add(self, rhs: WorldOffset) -> Self::Output {
       let x = self.x as i32 + rhs.x;
       let y = self.y as i32 + rhs.y;
       if x < 0 || y < 0 || x as usize >= WORLD_WIDTH || y as usize >= WORLD_WIDTH {
-        None
+        DOption::none()
       } else {
-        Some(WorldCoord { x: x as usize, y: y as usize })
+        DOption::some(WorldCoord { x: x as usize, y: y as usize })
       }
     }
 }
@@ -73,11 +75,11 @@ impl WorldOffset {
 
 pub struct WorldCursor<'a> {
   coord: WorldCoord,
-  cells: &'a [Cell; WORLD_WIDTH * WORLD_WIDTH],
+  cells: &'a [Cell],
 }
 
 impl<'a> WorldCursor<'a> {
-  pub fn new(cells: &'a [Cell; WORLD_WIDTH * WORLD_WIDTH], coord: WorldCoord) -> WorldCursor<'a> {
+  pub fn new(cells: &'a [Cell], coord: WorldCoord) -> WorldCursor<'a> {
     WorldCursor { coord, cells }
   }
 
@@ -100,8 +102,8 @@ impl<'a> WorldCursor<'a> {
 
   fn get_cell_at_offset(&self, offset: WorldOffset) -> Cell {
       match self.coord + offset {
-        Some(coord) => self.get_cell_at_coord(coord),
-        None => Cell::Dead
+        DOption(true, coord) => self.get_cell_at_coord(coord),
+        DOption(false, _) => Cell::Dead
       }
     }
   

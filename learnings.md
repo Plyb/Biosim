@@ -2,6 +2,7 @@
 
 1. My current GPU (2060 Super) maxes out at 1024 work group invocations, so trying to do more threads than 32x32 causes device loss (leading to a panic in bevy)
 2. Bevy for some reason doesn't like it if I use a rust-gpu shader that includes an enum with repr(u8). Not a big deal though since my cells will eventually be several bytes in size
+3. Rust-GPU unfortunately does not support algebraic datatypes at this moment. Data-less enums are fine though
 
 # 2025-02-03
 
