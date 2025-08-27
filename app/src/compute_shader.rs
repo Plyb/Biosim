@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy::ecs::system::Resource;
+use bevy::{ecs::system::Resource, log::info_span};
 use biosim_core::{world::Cell, WORLD_WIDTH};
 use vulkano::{buffer::{BufferUsage, CpuAccessibleBuffer}, command_buffer::{allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage}, descriptor_set::{allocator::StandardDescriptorSetAllocator, layout::DescriptorType, PersistentDescriptorSet, WriteDescriptorSet}, device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags}, instance::{Instance, InstanceCreateInfo}, memory::allocator::StandardMemoryAllocator, pipeline::{ComputePipeline, Pipeline, PipelineBindPoint}, shader::{spirv::{Capability, ExecutionModel}, DescriptorRequirements, EntryPointInfo, ShaderExecution, ShaderInterface, ShaderModule, ShaderStages}, sync::{self, GpuFuture}, Version, VulkanLibrary};
 
@@ -17,7 +17,9 @@ pub struct BiosimComputeShader {
 
 impl BiosimComputeShader {
     pub fn dispatch(&self, input: &Vec<Cell>) -> Vec<Cell> {
+        let copy_span = info_span!("copying").entered();
         self.copy_to_buffer(input);
+        copy_span.exit();
 
         let mut builder = AutoCommandBufferBuilder::primary(
                 &self.buffer_allocator,
@@ -31,13 +33,16 @@ impl BiosimComputeShader {
 
         let command_buffer = builder.build().unwrap();
 
+        let gpu_execution_span = info_span!("gpu").entered();
         let future = sync::now(self.device.clone())
             .then_execute(self.queue.clone(), command_buffer).unwrap()
             .then_signal_fence_and_flush().unwrap();
-
         future.wait(None).unwrap();
+        gpu_execution_span.exit();
 
+        let read_back_span = info_span!("read_back").entered();
         let content = self.output_buffer.read().unwrap().to_vec();
+        read_back_span.exit();
         content
     }
 

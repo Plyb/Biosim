@@ -2,7 +2,7 @@ use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::co
 use bevy_pancam::{PanCam, PanCamPlugin};
 use biosim_core::{world::Cell, WORLD_WIDTH};
 
-use crate::world::new_random;
+use crate::world::{new_random, tick};
 use crate::compute_shader::BiosimComputeShader;
 use bevy::prelude::*;
 
@@ -86,10 +86,8 @@ fn update_world(
         world_material.hexels = images.add(image);
 
         let tick_span = info_span!("ticking").entered();
-        // world_component.0 = tick(&world_component.0);
+        // world_component.0 = compute_shader.dispatch(&cells);
+        world_component.0 = tick(&world_component.0);
         tick_span.exit();
-
-        world_component.0 = compute_shader.dispatch(&cells);
-        // println!("Result: {:?}", last_output.0);
   }
 }
