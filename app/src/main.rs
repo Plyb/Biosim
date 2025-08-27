@@ -9,8 +9,8 @@ mod biosim_plugin;
 mod compute_shader;
 
 fn main() {
-  App::new()
-    .add_plugins((DefaultPlugins, BiosimPlugin))
-    .run();
+    App::new()
+        .add_plugins((DefaultPlugins, BiosimPlugin))
+        .run();
 }
 

@@ -10,29 +10,29 @@ use bevy::prelude::*;
 pub struct BiosimPlugin;
 
 impl Plugin for BiosimPlugin {
-  fn build(&self, app: &mut App) {
-    app.add_plugins((PanCamPlugin::default(), Material2dPlugin::<WorldMaterial>::default()))
-      .insert_resource(WorldTickTimer(Timer::from_seconds(0.5, TimerMode::Repeating)))
-      .add_systems(Startup, setup)
-      .add_systems(Update, update_world);
-  }
+    fn build(&self, app: &mut App) {
+        app.add_plugins((PanCamPlugin::default(), Material2dPlugin::<WorldMaterial>::default()))
+        .insert_resource(WorldTickTimer(Timer::from_seconds(0.5, TimerMode::Repeating)))
+        .add_systems(Startup, setup)
+        .add_systems(Update, update_world);
+    }
 }
 
 #[derive(Resource)]
 struct WorldTickTimer(Timer);
 
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>) {
-  commands.spawn(Camera2dBundle::default())
-    .insert(PanCam::default());
+    commands.spawn(Camera2dBundle::default())
+        .insert(PanCam::default());
 
-  commands.spawn(MaterialMesh2dBundle {
-    mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * 6.0, y: WORLD_WIDTH as f32 })).into(),
-    material: materials.add(WorldMaterial { hexels: default() }),
-    ..default()
-  }).insert(WorldComponent(new_random()));
+    commands.spawn(MaterialMesh2dBundle {
+        mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * 6.0, y: WORLD_WIDTH as f32 })).into(),
+        material: materials.add(WorldMaterial { hexels: default() }),
+        ..default()
+    }).insert(WorldComponent(new_random()));
 
-  let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH);
-  commands.insert_resource(compute_shader);
+    let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH);
+    commands.insert_resource(compute_shader);
 } 
 
 #[derive(Component)]
@@ -40,56 +40,56 @@ struct WorldComponent(Vec<Cell>);
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct WorldMaterial {
-  #[texture(0)]
-  #[sampler(1)]
-  hexels: Handle<Image>
+    #[texture(0)]
+    #[sampler(1)]
+    hexels: Handle<Image>
 }
 
 impl Material2d for WorldMaterial {
-  fn fragment_shader() -> ShaderRef {
-    env!("biosim_rust_shader.spv").into()
-  }
+    fn fragment_shader() -> ShaderRef {
+        env!("biosim_rust_shader.spv").into()
+    }
 }
 
 fn update_world(
-  mut materials: ResMut<Assets<WorldMaterial>>,
-  mut images: ResMut<Assets<Image>>,
-  mut timer: ResMut<WorldTickTimer>,
-  time: Res<Time>,
-  mut query: Query<(&mut WorldComponent,&mut Handle<WorldMaterial>)>,
-  compute_shader: Res<BiosimComputeShader>
+    mut materials: ResMut<Assets<WorldMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+    mut timer: ResMut<WorldTickTimer>,
+    time: Res<Time>,
+    mut query: Query<(&mut WorldComponent,&mut Handle<WorldMaterial>)>,
+    compute_shader: Res<BiosimComputeShader>
 ) {
-  if !timer.0.tick(time.delta()).just_finished() {
-    return;
-  }
+    if !timer.0.tick(time.delta()).just_finished() {
+        return;
+    }
   let _true_update_world_span = info_span!("update_world_past_timer").entered();
 
-  for (mut world_component, mesh_handle) in &mut query {
-    let Some(world_material) = materials.get_mut(mesh_handle.id()) else {
-      break;
-    };
+    for (mut world_component, mesh_handle) in &mut query {
+        let Some(world_material) = materials.get_mut(mesh_handle.id()) else {
+            break;
+        };
 
-    let collection_span = info_span!("collection").entered();
-    let cells: &Vec<Cell> = &world_component.0;
-    let colors: Vec<u8> = cells.iter().flat_map(|cell| 
-      if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }
-    ).collect();
-    collection_span.exit();
+        let collection_span = info_span!("collection").entered();
+        let cells: &Vec<Cell> = &world_component.0;
+        let colors: Vec<u8> = cells.iter().flat_map(|cell| 
+            if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }
+        ).collect();
+        collection_span.exit();
 
-    let image = Image::new(
-      Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 },
-      TextureDimension::D2,
-      colors,
-      TextureFormat::Rgba8Unorm,
-      RenderAssetUsages::RENDER_WORLD
-    );
-    world_material.hexels = images.add(image);
+        let image = Image::new(
+            Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 },
+            TextureDimension::D2,
+            colors,
+            TextureFormat::Rgba8Unorm,
+            RenderAssetUsages::RENDER_WORLD
+        );
+        world_material.hexels = images.add(image);
 
-    let tick_span = info_span!("ticking").entered();
-    // world_component.0 = tick(&world_component.0);
-    tick_span.exit();
+        let tick_span = info_span!("ticking").entered();
+        // world_component.0 = tick(&world_component.0);
+        tick_span.exit();
 
-    world_component.0 = compute_shader.dispatch(&cells);
-    // println!("Result: {:?}", last_output.0);
+        world_component.0 = compute_shader.dispatch(&cells);
+        // println!("Result: {:?}", last_output.0);
   }
 }
