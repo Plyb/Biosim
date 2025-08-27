@@ -3,4 +3,4 @@
 pub mod world;
 pub mod util;
 
-pub const WORLD_WIDTH: usize = 32;
+pub const WORLD_WIDTH: usize = 2048;

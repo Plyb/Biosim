@@ -86,8 +86,8 @@ fn update_world(
         world_material.hexels = images.add(image);
 
         let tick_span = info_span!("ticking").entered();
-        // world_component.0 = compute_shader.dispatch(&cells);
-        world_component.0 = tick(&world_component.0);
+        world_component.0 = compute_shader.dispatch(&cells);
+        // world_component.0 = tick(&world_component.0);
         tick_span.exit();
   }
 }

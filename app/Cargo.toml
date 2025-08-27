@@ -14,6 +14,7 @@ bevy_pancam = "0.11.1"
 biosim-core = { path = "../biosim-core"}
 vulkano = "0.32.3"
 vulkano-shaders = "0.32.0"
+ndarray = "0.16.0"
 
 [build-dependencies]
 spirv-builder = { version = "0.9" }

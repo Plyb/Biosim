@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bevy::{ecs::system::Resource, log::info_span};
 use biosim_core::{world::Cell, WORLD_WIDTH};
+use ndarray::{s, Array2, ArrayView};
 use vulkano::{buffer::{BufferUsage, CpuAccessibleBuffer}, command_buffer::{allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage}, descriptor_set::{allocator::StandardDescriptorSetAllocator, layout::DescriptorType, PersistentDescriptorSet, WriteDescriptorSet}, device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags}, instance::{Instance, InstanceCreateInfo}, memory::allocator::StandardMemoryAllocator, pipeline::{ComputePipeline, Pipeline, PipelineBindPoint}, shader::{spirv::{Capability, ExecutionModel}, DescriptorRequirements, EntryPointInfo, ShaderExecution, ShaderInterface, ShaderModule, ShaderStages}, sync::{self, GpuFuture}, Version, VulkanLibrary};
 
 #[derive(Resource)]
@@ -40,9 +41,24 @@ impl BiosimComputeShader {
         future.wait(None).unwrap();
         gpu_execution_span.exit();
 
-        let read_back_span = info_span!("read_back").entered();
-        let content = self.output_buffer.read().unwrap().to_vec();
-        read_back_span.exit();
+        let readback_span = info_span!("readback").entered();
+        let read_lock = self.output_buffer.read().unwrap();
+
+        let arr_lock = info_span!("arr").entered();
+        let arr = ArrayView::from_shape((WORLD_WIDTH, WORLD_WIDTH), &read_lock).unwrap();
+        arr_lock.exit();
+        let sliced_lock = info_span!("slice").entered();
+        let sliced = arr.slice(s![0..32, 0..64]);
+        sliced_lock.exit();
+        let padded_lock = info_span!("padded").entered();
+        let mut padded = Array2::<Cell>::default((WORLD_WIDTH, WORLD_WIDTH));
+        padded.slice_mut(s![0..32, 0..64]).assign(&sliced);
+        padded_lock.exit();
+        let to_vec_lock = info_span!("to_vec").entered();
+        let content = padded.to_shape(WORLD_WIDTH * WORLD_WIDTH).unwrap().to_vec();
+        to_vec_lock.exit();
+
+        readback_span.exit();
         content
     }
 
