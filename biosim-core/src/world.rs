@@ -42,7 +42,7 @@ impl Distribution<Cell> for Standard {
 
 impl Copy for Cell {}
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct WorldCoord {
     pub x: usize,
     pub y: usize,
@@ -54,17 +54,25 @@ pub struct WorldOffset {
 }
 
 impl ops::Add<WorldOffset> for WorldCoord {
-        type Output = DOption<WorldCoord>;
+    type Output = DOption<WorldCoord>;
 
-        fn add(self, rhs: WorldOffset) -> Self::Output {
-            let x = self.x as i32 + rhs.x;
-            let y = self.y as i32 + rhs.y;
-            if x < 0 || y < 0 || x as usize >= WORLD_WIDTH || y as usize >= WORLD_WIDTH {
-                DOption::none()
-            } else {
-                DOption::some(WorldCoord { x: x as usize, y: y as usize })
-            }
+    fn add(self, rhs: WorldOffset) -> Self::Output {
+        let x = self.x as i32 + rhs.x;
+        let y = self.y as i32 + rhs.y;
+        if x < 0 || y < 0 || x as usize >= WORLD_WIDTH || y as usize >= WORLD_WIDTH {
+            DOption::none()
+        } else {
+            DOption::some(WorldCoord { x: x as usize, y: y as usize })
         }
+    }
+}
+
+impl WorldCoord {
+    pub fn add_clamped(&self, offset: WorldOffset) -> WorldCoord {
+        let x = (self.x as i32 + offset.x).clamp(0, WORLD_WIDTH as i32 - 1) as usize;
+        let y = (self.y as i32 + offset.y).clamp(0, WORLD_WIDTH as i32 - 1) as usize;
+        WorldCoord { x, y }
+    }
 }
 
 impl WorldOffset {

@@ -25,14 +25,18 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     commands.spawn(Camera2dBundle::default())
         .insert(PanCam::default());
 
+    let cells = new_random();
+    let world_component = WorldComponent(cells);
+
+    let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH);
+    compute_shader.copy_to_buffer(&world_component.0);
+    commands.insert_resource(compute_shader);
+
     commands.spawn(MaterialMesh2dBundle {
         mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * 6.0, y: WORLD_WIDTH as f32 })).into(),
         material: materials.add(WorldMaterial { hexels: default() }),
         ..default()
-    }).insert(WorldComponent(new_random()));
-
-    let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH);
-    commands.insert_resource(compute_shader);
+    }).insert(world_component);
 } 
 
 #[derive(Component)]
@@ -56,15 +60,18 @@ fn update_world(
     mut images: ResMut<Assets<Image>>,
     mut timer: ResMut<WorldTickTimer>,
     time: Res<Time>,
-    mut query: Query<(&mut WorldComponent,&mut Handle<WorldMaterial>)>,
-    compute_shader: Res<BiosimComputeShader>
+    mut world_query: Query<(&mut WorldComponent,&mut Handle<WorldMaterial>)>,
+    mut compute_shader: ResMut<BiosimComputeShader>,
+    camera_query: Query<&GlobalTransform, With<Camera>>,
 ) {
     if !timer.0.tick(time.delta()).just_finished() {
         return;
     }
-  let _true_update_world_span = info_span!("update_world_past_timer").entered();
+    let _true_update_world_span = info_span!("update_world_past_timer").entered();
 
-    for (mut world_component, mesh_handle) in &mut query {
+    let camera_pos = camera_query.get_single().unwrap().translation();
+
+    for (mut world_component, mesh_handle) in &mut world_query {
         let Some(world_material) = materials.get_mut(mesh_handle.id()) else {
             break;
         };
@@ -86,7 +93,9 @@ fn update_world(
         world_material.hexels = images.add(image);
 
         let tick_span = info_span!("ticking").entered();
-        world_component.0 = compute_shader.dispatch(&cells);
+        compute_shader.dispatch();
+        world_component.0 = compute_shader.read_back(camera_pos);
+        compute_shader.swap_buffers();
         // world_component.0 = tick(&world_component.0);
         tick_span.exit();
   }

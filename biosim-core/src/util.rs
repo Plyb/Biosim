@@ -11,5 +11,12 @@ where T: Default
     pub fn none() -> DOption<T> {
         DOption(false, Default::default())
     }
+
+    pub fn unwrap_or_default(self, default: T) -> T {
+        match self {
+            DOption(true, item) => item,
+            DOption(false, _) => default
+        }
+    }
 }
 

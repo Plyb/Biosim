@@ -1,27 +1,25 @@
 use std::sync::Arc;
 
-use bevy::{ecs::system::Resource, log::info_span};
-use biosim_core::{world::Cell, WORLD_WIDTH};
+use bevy::{ecs::system::Resource, log::info_span, math::Vec3};
+use biosim_core::{hex_grid::{uv_to_hexel_coord, world_space_to_uv}, world::{get_index, Cell, WorldCoord, WorldOffset}, WORLD_WIDTH};
 use ndarray::{s, Array2, ArrayView};
-use vulkano::{buffer::{BufferUsage, CpuAccessibleBuffer}, command_buffer::{allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage}, descriptor_set::{allocator::StandardDescriptorSetAllocator, layout::DescriptorType, PersistentDescriptorSet, WriteDescriptorSet}, device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags}, instance::{Instance, InstanceCreateInfo}, memory::allocator::StandardMemoryAllocator, pipeline::{ComputePipeline, Pipeline, PipelineBindPoint}, shader::{spirv::{Capability, ExecutionModel}, DescriptorRequirements, EntryPointInfo, ShaderExecution, ShaderInterface, ShaderModule, ShaderStages}, sync::{self, GpuFuture}, Version, VulkanLibrary};
+use vulkano::{buffer::{BufferUsage, CpuAccessibleBuffer}, command_buffer::{allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage}, descriptor_set::{allocator::StandardDescriptorSetAllocator, layout::{DescriptorSetLayout, DescriptorType}, PersistentDescriptorSet, WriteDescriptorSet}, device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags}, instance::{Instance, InstanceCreateInfo}, memory::allocator::StandardMemoryAllocator, pipeline::{ComputePipeline, Pipeline, PipelineBindPoint}, shader::{spirv::{Capability, ExecutionModel}, DescriptorRequirements, EntryPointInfo, ShaderExecution, ShaderInterface, ShaderModule, ShaderStages}, sync::{self, GpuFuture}, Version, VulkanLibrary};
 
 #[derive(Resource)]
 pub struct BiosimComputeShader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     pipeline: Arc<ComputePipeline>,
+    descriptor_set_allocator: StandardDescriptorSetAllocator,
     descriptor_set: Arc<PersistentDescriptorSet>,
+    layout: Arc<DescriptorSetLayout>,
     buffer_allocator: StandardCommandBufferAllocator,
     input_buffer: Arc<CpuAccessibleBuffer<[Cell]>>, // Note that this means we have a fixed sized for our buffer. If we want variable size, we'd need to rebuild the buffer each time.
     output_buffer: Arc<CpuAccessibleBuffer<[Cell]>>,
 }
 
 impl BiosimComputeShader {
-    pub fn dispatch(&self, input: &Vec<Cell>) -> Vec<Cell> {
-        let copy_span = info_span!("copying").entered();
-        self.copy_to_buffer(input);
-        copy_span.exit();
-
+    pub fn dispatch(&self) {
         let mut builder = AutoCommandBufferBuilder::primary(
                 &self.buffer_allocator,
                 self.queue.queue_family_index(),
@@ -41,32 +39,54 @@ impl BiosimComputeShader {
         future.wait(None).unwrap();
         gpu_execution_span.exit();
 
-        let readback_span = info_span!("readback").entered();
+        
+    }
+
+    pub fn swap_buffers(&mut self) {
+        (self.input_buffer, self.output_buffer) = (self.output_buffer.clone(), self.input_buffer.clone());
+        self.descriptor_set = PersistentDescriptorSet::new(
+            &self.descriptor_set_allocator,
+            self.layout.clone(),
+            [WriteDescriptorSet::buffer(0, self.input_buffer.clone()), WriteDescriptorSet::buffer(1, self.output_buffer.clone())],
+        ).unwrap();
+    }
+
+    pub fn copy_to_buffer(&self, input: &[Cell]) {
+        let mut content = self.input_buffer.write().unwrap();
+        for (src, dst) in input.iter().zip(content.iter_mut()) {
+            *dst = *src;
+        }
+    }
+
+    pub fn read_back(&self, camera_pos: Vec3) -> Vec<Cell> {
+        let (u, v) = world_space_to_uv(camera_pos.x, camera_pos.y);
+        let center = uv_to_hexel_coord(u, v);
+
+        const CHUNK_RADIUS: i32 = 256;
+        let low = center.add_clamped(WorldOffset { x: -CHUNK_RADIUS, y: -CHUNK_RADIUS });
+        let high = center.add_clamped(WorldOffset { x: CHUNK_RADIUS, y: CHUNK_RADIUS });
+        println!("{:?}-{:?}", low, high);
+
+        let _readback_span = info_span!("readback").entered();
         let read_lock = self.output_buffer.read().unwrap();
 
         let arr_lock = info_span!("arr").entered();
         let arr = ArrayView::from_shape((WORLD_WIDTH, WORLD_WIDTH), &read_lock).unwrap();
         arr_lock.exit();
         let sliced_lock = info_span!("slice").entered();
-        let sliced = arr.slice(s![0..32, 0..64]);
+        let sliced = arr.slice(s![low.y..high.y, low.x..high.x]);
         sliced_lock.exit();
         let padded_lock = info_span!("padded").entered();
         let mut padded = Array2::<Cell>::default((WORLD_WIDTH, WORLD_WIDTH));
-        padded.slice_mut(s![0..32, 0..64]).assign(&sliced);
         padded_lock.exit();
+        let assign_lock = info_span!("assign").entered();
+        padded.slice_mut(s![low.y..high.y, low.x..high.x]).assign(&sliced);
+        assign_lock.exit();
         let to_vec_lock = info_span!("to_vec").entered();
         let content = padded.to_shape(WORLD_WIDTH * WORLD_WIDTH).unwrap().to_vec();
         to_vec_lock.exit();
 
-        readback_span.exit();
         content
-    }
-
-    fn copy_to_buffer(&self, input: &[Cell]) {
-        let mut content = self.input_buffer.write().unwrap();
-        for (src, dst) in input.iter().zip(content.iter_mut()) {
-            *dst = *src;
-        }
     }
 
     pub fn new(buffer_length: usize) -> BiosimComputeShader {
@@ -192,6 +212,6 @@ impl BiosimComputeShader {
         ).unwrap();
 
         let buffer_allocator = StandardCommandBufferAllocator::new(device.clone(), Default::default());
-        BiosimComputeShader { device, queue, pipeline, descriptor_set, buffer_allocator, input_buffer, output_buffer }
+        BiosimComputeShader { device, queue, pipeline: pipeline.clone(), descriptor_set, descriptor_set_allocator, layout: layout.clone(), buffer_allocator, input_buffer, output_buffer }
     }
 }
