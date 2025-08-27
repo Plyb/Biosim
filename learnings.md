@@ -1,3 +1,8 @@
+# 2025-08-27
+
+1. Turns out people weren't kidding: readback from the GPU really is very slow! On the release profile with a 2048^2 grid, the `update_world` function takes about 650ms to run when using gpu simulation. About 550ms of that is just the readback from the GPU.
+   1. Side note on this, it turns out that debug mode slows down the CPU simulation much more than the GPU simulation (which makes sense, since the GPU code isn't instrumented for debug). GPU is actually faster at 2048^2 grid than CPU when in debug mode. 
+
 # 2025-08-26
 
 1. My current GPU (2060 Super) maxes out at 1024 work group invocations, so trying to do more threads than 32x32 causes device loss (leading to a panic in bevy)
