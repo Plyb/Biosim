@@ -1,3 +1,5 @@
+use std::vec;
+
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
 use biosim_core::{world::Cell, WORLD_WIDTH};
@@ -21,7 +23,7 @@ impl Plugin for BiosimPlugin {
 #[derive(Resource)]
 struct WorldTickTimer(Timer);
 
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>) {
+fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut<Assets<Image>>) {
     commands.spawn(Camera2dBundle::default())
         .insert(PanCam::default());
 
@@ -32,9 +34,19 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     compute_shader.copy_to_buffer(&world_component.0);
     commands.insert_resource(compute_shader);
 
+    let image = Image::new(
+        Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        vec![u8::MAX; WORLD_WIDTH * WORLD_WIDTH * 4],
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
+    );
+    let image_handle = images.add(image); println!("Original: {:?}", image_handle.id());
+    let world_material = WorldMaterial { hexels: image_handle };
+
     commands.spawn(MaterialMesh2dBundle {
         mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * 6.0, y: WORLD_WIDTH as f32 })).into(),
-        material: materials.add(WorldMaterial { hexels: default() }),
+        material: materials.add(world_material),
         ..default()
     }).insert(world_component);
 } 
@@ -60,7 +72,7 @@ fn update_world(
     mut images: ResMut<Assets<Image>>,
     mut timer: ResMut<WorldTickTimer>,
     time: Res<Time>,
-    mut world_query: Query<(&mut WorldComponent,&mut Handle<WorldMaterial>)>,
+    world_query: Query<(&WorldComponent,&Handle<WorldMaterial>)>,
     mut compute_shader: ResMut<BiosimComputeShader>,
     camera_query: Query<&GlobalTransform, With<Camera>>,
 ) {
@@ -71,30 +83,19 @@ fn update_world(
 
     let camera_pos = camera_query.get_single().unwrap().translation();
 
-    for (mut world_component, mesh_handle) in &mut world_query {
+    for (_, mesh_handle) in &world_query {
         let Some(world_material) = materials.get_mut(mesh_handle.id()) else {
             break;
         };
 
-        let collection_span = info_span!("collection").entered();
-        let cells: &Vec<Cell> = &world_component.0;
-        let colors: Vec<u8> = cells.iter().flat_map(|cell| 
-            if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }
-        ).collect();
-        collection_span.exit();
-
-        let image = Image::new(
-            Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 },
-            TextureDimension::D2,
-            colors,
-            TextureFormat::Rgba8Unorm,
-            RenderAssetUsages::RENDER_WORLD
-        );
-        world_material.hexels = images.add(image);
+        let Some(image) = images.remove(world_material.hexels.id()) else {
+            break;
+        };
 
         let tick_span = info_span!("ticking").entered();
         compute_shader.dispatch();
-        world_component.0 = compute_shader.read_back(camera_pos);
+        let updated_image = compute_shader.read_back_to_image(camera_pos, image);
+        world_material.hexels = images.add(updated_image);
         compute_shader.swap_buffers();
         // world_component.0 = tick(&world_component.0);
         tick_span.exit();
