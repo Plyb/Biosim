@@ -21,3 +21,4 @@ spirv-builder = { version = "0.9" }
 
 [features]
 cpu = []
+rect_grid = []

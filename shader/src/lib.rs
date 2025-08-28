@@ -15,13 +15,18 @@ pub fn fragment(
     material_sampler: &Sampler,
     output: &mut Vec4
 ) {
-    hex_grid(uv, material_color_texture, material_sampler, output);
+    if cfg!(feature = "rect_grid") {
+        rect_grid(uv, material_color_texture, material_sampler, output);
+    } else {
+        hex_grid(uv, material_color_texture, material_sampler, output);
+    }
 }
 
-// fn rect_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampler, output: &mut Vec4) {
-//   let world_width = WORLD_WIDTH as f32;
-//   *output = material_color_texture.sample(*material_sampler, ((uv * world_width).floor() + 0.5) / world_width)
-// }
+fn rect_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampler, output: &mut Vec4) {
+  let world_width = WORLD_WIDTH as f32;
+  let uv = Vec2 { x: uv.x, y: 1.0 - uv.y };
+  *output = material_color_texture.sample(*material_sampler, ((uv * world_width).floor() + 0.5) / world_width)
+}
 
 fn hex_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampler, output: &mut Vec4) {
     let world_width = WORLD_WIDTH as f32;

@@ -1,10 +1,10 @@
 use libm::floorf;
 
-use crate::{world::WorldCoord, WORLD_WIDTH};
+use crate::{world::WorldCoord, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
 
 pub fn uv_to_hexel_coord(u: f32, v: f32) -> WorldCoord {
     let world_width = WORLD_WIDTH as f32;
-    let u = u * 3.0;
+    let u = u * (WORLD_WIDTH_MULTIPLER / 2.0);
     let v = v;
     
     let mut column = floorf(u * world_width) as u32;
@@ -35,7 +35,13 @@ pub fn uv_to_hexel_coord(u: f32, v: f32) -> WorldCoord {
     WorldCoord { x: hexel_x as usize, y: hexel_y as usize }
 }
 
+pub fn uv_to_rect_grid_coord(u: f32, v: f32) -> WorldCoord {
+    let x = (u * WORLD_WIDTH as f32).clamp(0.0, WORLD_WIDTH as f32 - 1.0) as usize;
+    let y = (v * WORLD_WIDTH as f32).clamp(0.0, WORLD_WIDTH as f32 - 1.0) as usize;
+    WorldCoord { x, y }
+}
+
 pub fn world_space_to_uv(x: f32, y: f32) -> (f32, f32) {
     let world_width = WORLD_WIDTH as f32;
-    ((x + (world_width * 3.0)) / (world_width * 6.0), (y + (world_width * 0.5)) / world_width)
+    ((x + (world_width * WORLD_WIDTH_MULTIPLER * 0.5)) / (world_width * WORLD_WIDTH_MULTIPLER), (y + (world_width * 0.5)) / world_width)
 }

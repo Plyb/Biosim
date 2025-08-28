@@ -2,7 +2,7 @@ use std::vec;
 
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
-use biosim_core::{hex_grid::{uv_to_hexel_coord, world_space_to_uv}, world::{Cell, WorldCoord, WorldOffset}, WORLD_WIDTH};
+use biosim_core::{hex_grid::{uv_to_hexel_coord, uv_to_rect_grid_coord, world_space_to_uv}, world::{Cell, WorldCoord, WorldOffset}, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
 use ndarray::{s, ArrayView, ArrayViewMut};
 
 use crate::world::{new_random, tick};
@@ -46,7 +46,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     let world_material = WorldMaterial { hexels: image_handle };
 
     commands.spawn(MaterialMesh2dBundle {
-        mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * 6.0, y: WORLD_WIDTH as f32 })).into(),
+        mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * WORLD_WIDTH_MULTIPLER, y: WORLD_WIDTH as f32 })).into(),
         material: materials.add(world_material),
         ..default()
     }).insert(world_component);
@@ -95,7 +95,11 @@ fn update_world(
 
         let tick_span = info_span!("ticking").entered();
         let (u, v) = world_space_to_uv(camera_pos.x, camera_pos.y);
-        let center = uv_to_hexel_coord(u, v);
+        let center = if cfg!(feature = "rect_grid") {
+            uv_to_rect_grid_coord(u, v)
+        } else {
+            uv_to_hexel_coord(u, v)
+        };
 
         const CHUNK_RADIUS: i32 = 256;
         let low = if cfg!(feature = "cpu") {
