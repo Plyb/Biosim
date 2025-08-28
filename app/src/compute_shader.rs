@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use bevy::{ecs::system::Resource, log::info_span, math::Vec3, render::{render_asset::RenderAssetUsages, texture::Image}};
-use biosim_core::{hex_grid::{uv_to_hexel_coord, world_space_to_uv}, world::{Cell, WorldOffset}, WORLD_WIDTH};
-use ndarray::{s, ArrayView, ArrayViewMut};
+use bevy::{ecs::system::Resource, log::info_span};
+use biosim_core::{world::Cell, WORLD_WIDTH};
+use ndarray::{ArrayBase, ArrayView, Dim, OwnedRepr, SliceArg};
 use vulkano::{buffer::{BufferUsage, CpuAccessibleBuffer}, command_buffer::{allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage}, descriptor_set::{allocator::StandardDescriptorSetAllocator, layout::{DescriptorSetLayout, DescriptorType}, PersistentDescriptorSet, WriteDescriptorSet}, device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags}, instance::{Instance, InstanceCreateInfo}, memory::allocator::StandardMemoryAllocator, pipeline::{ComputePipeline, Pipeline, PipelineBindPoint}, shader::{spirv::{Capability, ExecutionModel}, DescriptorRequirements, EntryPointInfo, ShaderExecution, ShaderInterface, ShaderModule, ShaderStages}, sync::{self, GpuFuture}, Version, VulkanLibrary};
 
 #[derive(Resource)]
@@ -60,34 +60,18 @@ impl BiosimComputeShader {
         }
     }
 
-    pub fn read_back_to_image(&self, camera_pos: Vec3, image: Image) -> Image {
-        let (u, v) = world_space_to_uv(camera_pos.x, camera_pos.y);
-        let center = uv_to_hexel_coord(u, v);
-
-        const CHUNK_RADIUS: i32 = 256;
-        let low = center.add_clamped(WorldOffset { x: -CHUNK_RADIUS, y: -CHUNK_RADIUS });
-        let high = center.add_clamped(WorldOffset { x: CHUNK_RADIUS, y: CHUNK_RADIUS });
-
+    pub fn read_back<S: SliceArg<Dim<[usize; 2]>>>(&self, slice_arg: S) -> ArrayBase<OwnedRepr<u8>, Dim<[usize; 3]>> {
         let _readback_span = info_span!("readback").entered();
         let read_lock = self.output_buffer.read().unwrap();
 
         let gpu_chunk_lock = info_span!("gpu_chunk").entered();
         let cells_from_gpu = ArrayView::from_shape((WORLD_WIDTH, WORLD_WIDTH), &read_lock).unwrap();
-        let chunk_from_gpu = cells_from_gpu.slice(s![low.y..high.y, low.x..high.x]);
+        let chunk_from_gpu = cells_from_gpu.slice(slice_arg);
         let bytes_from_gpu_flat = chunk_from_gpu.iter().flat_map(|cell| if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect::<Vec<u8>>();
         let bytes_from_gpu = ArrayView::from_shape((chunk_from_gpu.shape()[0], chunk_from_gpu.shape()[1], 4), &bytes_from_gpu_flat.as_slice()).unwrap();
         gpu_chunk_lock.exit();
 
-        let image_lock = info_span!("image").entered();
-        let mut dyn_img = Image::try_into_dynamic(image).unwrap();
-        let mut image_bytes = ArrayViewMut::from_shape((WORLD_WIDTH, WORLD_WIDTH, 4), dyn_img.as_mut_rgba8().unwrap()).unwrap();
-        image_lock.exit();
-
-        let assign_lock = info_span!("assign").entered();
-        image_bytes.slice_mut(s![low.y..high.y, low.x..high.x, ..]).assign(&bytes_from_gpu);
-        assign_lock.exit();
-
-        Image::from_dynamic(dyn_img, true, RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD)
+        bytes_from_gpu.into_owned()
     }
 
     pub fn new(buffer_length: usize) -> BiosimComputeShader {

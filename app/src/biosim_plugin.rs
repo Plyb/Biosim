@@ -2,7 +2,8 @@ use std::vec;
 
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
-use biosim_core::{world::Cell, WORLD_WIDTH};
+use biosim_core::{hex_grid::{uv_to_hexel_coord, world_space_to_uv}, world::{Cell, WorldOffset}, WORLD_WIDTH};
+use ndarray::{s, ArrayViewMut};
 
 use crate::world::{new_random, tick};
 use crate::compute_shader::BiosimComputeShader;
@@ -93,11 +94,36 @@ fn update_world(
         };
 
         let tick_span = info_span!("ticking").entered();
+        let (u, v) = world_space_to_uv(camera_pos.x, camera_pos.y);
+        let center = uv_to_hexel_coord(u, v);
+
+        const CHUNK_RADIUS: i32 = 256;
+        let low = center.add_clamped(WorldOffset { x: -CHUNK_RADIUS, y: -CHUNK_RADIUS });
+        let high = center.add_clamped(WorldOffset { x: CHUNK_RADIUS, y: CHUNK_RADIUS });
+
+        
         compute_shader.dispatch();
-        let updated_image = compute_shader.read_back_to_image(camera_pos, image);
-        world_material.hexels = images.add(updated_image);
+        let slice_arg = s![low.y..high.y, low.x..high.x];
+        let bytes_from_gpu = compute_shader.read_back(slice_arg);
         compute_shader.swap_buffers();
-        // world_component.0 = tick(&world_component.0);
+        
+        let image_lock = info_span!("image").entered();
+        let mut dyn_img = Image::try_into_dynamic(image).unwrap();
+        let mut image_bytes = ArrayViewMut::from_shape((WORLD_WIDTH, WORLD_WIDTH, 4), dyn_img.as_mut_rgba8().unwrap()).unwrap();
+        image_lock.exit();
+
+        let assign_lock = info_span!("assign").entered();
+        image_bytes.slice_mut(s![low.y..high.y, low.x..high.x, ..]).assign(&bytes_from_gpu);
+        assign_lock.exit();
+
+
+        let updated_image = Image::from_dynamic(
+            dyn_img,
+            true,
+            RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
+        );
+        world_material.hexels = images.add(updated_image);
+
         tick_span.exit();
   }
 }
