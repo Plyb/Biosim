@@ -1,6 +1,6 @@
 use std::vec;
 
-use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
+use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Buffer, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
 use biosim_core::{hex_grid::{uv_to_hexel_coord, uv_to_rect_grid_coord, world_space_to_uv}, world::{Cell, WorldCoord, WorldOffset}, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
 use ndarray::{s, ArrayView, ArrayViewMut};
@@ -43,7 +43,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
     );
     let image_handle = images.add(image); println!("Original: {:?}", image_handle.id());
-    let world_material = WorldMaterial { hexels: image_handle };
+    let world_material = WorldMaterial { hexels: image_handle }; // TODO: add buffer
 
     commands.spawn(MaterialMesh2dBundle {
         mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * WORLD_WIDTH_MULTIPLER, y: WORLD_WIDTH as f32 })).into(),
@@ -59,7 +59,10 @@ struct WorldComponent(Vec<Cell>);
 struct WorldMaterial {
     #[texture(0)]
     #[sampler(1)]
-    hexels: Handle<Image>
+    hexels: Handle<Image>,
+
+    // #[storage(3, read_only, buffer)]
+    // buffer: Buffer,
 }
 
 impl Material2d for WorldMaterial {
