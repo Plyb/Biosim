@@ -60,18 +60,16 @@ impl BiosimComputeShader {
         }
     }
 
-    pub fn read_back<S: SliceArg<Dim<[usize; 2]>>>(&self, slice_arg: S) -> ArrayBase<OwnedRepr<u8>, Dim<[usize; 3]>> {
+    pub fn read_back<S: SliceArg<Dim<[usize; 2]>>>(&self, slice_arg: S) -> ArrayBase<OwnedRepr<Cell>, S::OutDim> {
         let _readback_span = info_span!("readback").entered();
         let read_lock = self.output_buffer.read().unwrap();
 
         let gpu_chunk_lock = info_span!("gpu_chunk").entered();
         let cells_from_gpu = ArrayView::from_shape((WORLD_WIDTH, WORLD_WIDTH), &read_lock).unwrap();
         let chunk_from_gpu = cells_from_gpu.slice(slice_arg);
-        let bytes_from_gpu_flat = chunk_from_gpu.iter().flat_map(|cell| if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect::<Vec<u8>>();
-        let bytes_from_gpu = ArrayView::from_shape((chunk_from_gpu.shape()[0], chunk_from_gpu.shape()[1], 4), &bytes_from_gpu_flat.as_slice()).unwrap();
         gpu_chunk_lock.exit();
 
-        bytes_from_gpu.into_owned()
+        chunk_from_gpu.into_owned()
     }
 
     pub fn new(buffer_length: usize) -> BiosimComputeShader {

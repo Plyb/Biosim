@@ -2,8 +2,8 @@ use std::vec;
 
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
-use biosim_core::{hex_grid::{uv_to_hexel_coord, world_space_to_uv}, world::{Cell, WorldOffset}, WORLD_WIDTH};
-use ndarray::{s, ArrayViewMut};
+use biosim_core::{hex_grid::{uv_to_hexel_coord, world_space_to_uv}, world::{Cell, WorldCoord, WorldOffset}, WORLD_WIDTH};
+use ndarray::{s, ArrayView, ArrayViewMut};
 
 use crate::world::{new_random, tick};
 use crate::compute_shader::BiosimComputeShader;
@@ -73,7 +73,7 @@ fn update_world(
     mut images: ResMut<Assets<Image>>,
     mut timer: ResMut<WorldTickTimer>,
     time: Res<Time>,
-    world_query: Query<(&WorldComponent,&Handle<WorldMaterial>)>,
+    mut world_query: Query<(&mut WorldComponent, &Handle<WorldMaterial>)>,
     mut compute_shader: ResMut<BiosimComputeShader>,
     camera_query: Query<&GlobalTransform, With<Camera>>,
 ) {
@@ -84,7 +84,7 @@ fn update_world(
 
     let camera_pos = camera_query.get_single().unwrap().translation();
 
-    for (_, mesh_handle) in &world_query {
+    for (mut world_component, mesh_handle) in &mut world_query {
         let Some(world_material) = materials.get_mut(mesh_handle.id()) else {
             break;
         };
@@ -98,14 +98,30 @@ fn update_world(
         let center = uv_to_hexel_coord(u, v);
 
         const CHUNK_RADIUS: i32 = 256;
-        let low = center.add_clamped(WorldOffset { x: -CHUNK_RADIUS, y: -CHUNK_RADIUS });
-        let high = center.add_clamped(WorldOffset { x: CHUNK_RADIUS, y: CHUNK_RADIUS });
+        let low = if cfg!(feature = "cpu") {
+            WorldCoord::min()
+        } else {
+            center.add_clamped(WorldOffset { x: -CHUNK_RADIUS, y: -CHUNK_RADIUS })
+        };
+        let high = if cfg!(feature = "cpu") {
+            WorldCoord::max()
+        } else {
+            center.add_clamped(WorldOffset { x: CHUNK_RADIUS, y: CHUNK_RADIUS })
+        };
 
-        
-        compute_shader.dispatch();
-        let slice_arg = s![low.y..high.y, low.x..high.x];
-        let bytes_from_gpu = compute_shader.read_back(slice_arg);
-        compute_shader.swap_buffers();
+        let cell_chunk = if cfg!(feature = "cpu") {
+            world_component.0 = tick(&world_component.0);
+            ArrayView::from_shape((high.y - low.y, high.x - low.x), world_component.0.as_slice()).unwrap().to_owned()
+        } else {
+            compute_shader.dispatch();
+            let slice_arg = s![low.y..high.y, low.x..high.x];
+            let cells_from_gpu = compute_shader.read_back(slice_arg);
+            compute_shader.swap_buffers();
+            cells_from_gpu
+        };
+
+        let new_bytes_flat = cell_chunk.iter().flat_map(|cell| if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect::<Vec<u8>>();
+        let new_bytes = ArrayView::from_shape((high.y - low.y, high.x - low.x, 4), &new_bytes_flat.as_slice()).unwrap();
         
         let image_lock = info_span!("image").entered();
         let mut dyn_img = Image::try_into_dynamic(image).unwrap();
@@ -113,7 +129,7 @@ fn update_world(
         image_lock.exit();
 
         let assign_lock = info_span!("assign").entered();
-        image_bytes.slice_mut(s![low.y..high.y, low.x..high.x, ..]).assign(&bytes_from_gpu);
+        image_bytes.slice_mut(s![low.y..high.y, low.x..high.x, ..]).assign(&new_bytes);
         assign_lock.exit();
 
 

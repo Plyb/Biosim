@@ -73,6 +73,9 @@ impl WorldCoord {
         let y = (self.y as i32 + offset.y).clamp(0, WORLD_WIDTH as i32 - 1) as usize;
         WorldCoord { x, y }
     }
+
+    pub fn min() -> WorldCoord { WorldCoord { x: 0, y: 0 }}
+    pub fn max() -> WorldCoord { WorldCoord { x: WORLD_WIDTH - 1, y: WORLD_WIDTH - 1 } }
 }
 
 impl WorldOffset {
