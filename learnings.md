@@ -1,3 +1,7 @@
+# 2025-08-28
+
+1. You can mutably update an image in the version of bevy I'm using through a convoluted path of removing it from the assets, converting it to a DynamicImage and mutating that before adding it back. This is quite a bit faster than creating a fresh image each time, however, it does cause a significant hitch in bevy's internals with very large images. I think the only way around this is going to be updating the image from the GPU, which means bevy and vulkano need to share a buffer... might be time to bite the bullet and learn about bevy's rendering pipeline.
+
 # 2025-08-27
 
 1. Turns out people weren't kidding: readback from the GPU really is very slow! On the release profile with a 2048^2 grid, the `update_world` function takes about 650ms to run when using gpu simulation. About 550ms of that is just the readback from the GPU.
