@@ -9,7 +9,7 @@ use wgpu::{util::BufferInitDescriptor, BindGroup, BindGroupLayoutEntry, BufferDe
 
 #[derive(Resource)]
 pub struct BiosimComputeShader {
-    render_device: RenderDevice,
+    pub render_device: RenderDevice,
     render_queue: RenderQueue,
     // device: Arc<Device>,
     // queue: Queue,
@@ -140,14 +140,14 @@ impl BiosimComputeShader {
         chunk_from_gpu
     }
 
-    pub fn new(buffer_length: usize) -> BiosimComputeShader {
-        let instance = wgpu::Instance::new(InstanceDescriptor::default());
-        let adapter = instance.request_adapter(&Default::default()).block_on().unwrap();
-        let (device, queue) = adapter.request_device(&DeviceDescriptor { required_features: Features::SPIRV_SHADER_PASSTHROUGH, required_limits: Limits { max_storage_buffer_binding_size: 268435456, ..Default::default() }, ..Default::default() }, None).block_on().unwrap();
+    pub fn new(buffer_length: usize, render_device: RenderDevice, render_queue: RenderQueue) -> BiosimComputeShader {
+        // let instance = wgpu::Instance::new(InstanceDescriptor::default());
+        // let adapter = instance.request_adapter(&Default::default()).block_on().unwrap();
+        // let (device, queue) = adapter.request_device(&DeviceDescriptor { required_features: Features::SPIRV_SHADER_PASSTHROUGH, required_limits: Limits { max_storage_buffer_binding_size: 268435456, ..Default::default() }, ..Default::default() }, None).block_on().unwrap();
 
-        let render_device = RenderDevice::from(device);
-        let render_queue = RenderQueue(queue.into());
-       println!("Selected adapter: {}", adapter.get_info().name);
+        // let render_device = RenderDevice::from(device);
+        // let render_queue = RenderQueue(queue.into());
+    //    println!("Selected adapter: {}", render_device.adapter.get_info().name);
         // let library = VulkanLibrary::new().unwrap();
         // let instance = Instance::new(library, InstanceCreateInfo {
         //     ..Default::default()
@@ -267,11 +267,10 @@ impl BiosimComputeShader {
             usage: wgpu::BufferUsages::MAP_WRITE | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: true,
         });
-        let input_buffer = render_device.create_buffer(&BufferDescriptor {
+        let input_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             label: Some("buffer a"),
-            size: staging_input_buffer.size(),
+            contents: bytemuck::cast_slice(vec![Cell::Dead; buffer_length].as_slice()),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
         });
         let output_buffer = render_device.create_buffer(&BufferDescriptor {
             label: Some("buffer b"),
@@ -289,13 +288,13 @@ impl BiosimComputeShader {
         let bind_group_layout = render_device.create_bind_group_layout(Some("bind group layout"), &[
             BindGroupLayoutEntry {
                 binding: 2,
-                visibility: ShaderStages::COMPUTE,
+                visibility: ShaderStages::COMPUTE | ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: Some(NonZero::new(input_buffer.size()).unwrap()) },
                 count: None,
             },
             BindGroupLayoutEntry {
                 binding: 3,
-                visibility: ShaderStages::COMPUTE,
+                visibility: ShaderStages::COMPUTE | ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: Some(NonZero::new(output_buffer.size()).unwrap()) },
                 count: None,
             },

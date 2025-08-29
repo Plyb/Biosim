@@ -1,9 +1,10 @@
-use std::vec;
+use std::{any::Any, vec};
 
-use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Buffer, Extent3d, ShaderRef, TextureDimension, TextureFormat}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
+use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Buffer, Extent3d, ShaderRef, TextureDimension, TextureFormat}, renderer::{RenderDevice, RenderQueue}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
 use biosim_core::{hex_grid::{uv_to_hexel_coord, uv_to_rect_grid_coord, world_space_to_uv}, world::{Cell, WorldCoord, WorldOffset}, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
 use ndarray::{s, ArrayView, ArrayViewMut};
+use wgpu::util::BufferInitDescriptor;
 
 use crate::world::{new_random, tick};
 use crate::compute_shader::BiosimComputeShader;
@@ -24,14 +25,14 @@ impl Plugin for BiosimPlugin {
 #[derive(Resource)]
 struct WorldTickTimer(Timer);
 
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut<Assets<Image>>) {
+fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut<Assets<Image>>, render_device: Res<RenderDevice>, render_queue: Res<RenderQueue>) {
     commands.spawn(Camera2dBundle::default())
         .insert(PanCam::default());
 
     let cells = new_random();
     let world_component = WorldComponent(cells);
 
-    let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH);
+    let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH, render_device.clone(), render_queue.clone());
     compute_shader.copy_to_buffer(&world_component.0);
 
     let image = Image::new(
@@ -41,8 +42,9 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
     );
-    let image_handle = images.add(image); println!("Original: {:?}", image_handle.id());
-    let world_material = WorldMaterial { hexels: image_handle }; // TODO: add buffer
+    let image_handle = images.add(image);
+    let world_material = WorldMaterial { hexels: image_handle, buffer: compute_shader.input_buffer.clone() };
+    println!("built world material");
     commands.insert_resource(compute_shader);
 
     commands.spawn(MaterialMesh2dBundle {
@@ -50,6 +52,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         material: materials.add(world_material),
         ..default()
     }).insert(world_component);
+    println!("finished setup");
 } 
 
 #[derive(Component)]
@@ -61,8 +64,8 @@ struct WorldMaterial {
     #[sampler(1)]
     hexels: Handle<Image>,
 
-    // #[storage(2, read_only, buffer)]
-    // buffer: Buffer,
+    #[storage(2, read_only, buffer)]
+    buffer: Buffer,
 }
 
 impl Material2d for WorldMaterial {
@@ -124,7 +127,7 @@ fn update_world(
             let slice_arg = s![low.y..high.y, low.x..high.x];
             let cells_from_gpu = compute_shader.read_back(slice_arg);
             compute_shader.swap_buffers();
-            // world_material.buffer = compute_shader.input_buffer.clone();
+            world_material.buffer = compute_shader.input_buffer.clone();
             cells_from_gpu
         };
 

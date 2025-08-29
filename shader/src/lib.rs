@@ -9,16 +9,15 @@ pub fn fragment(
     _: Vec3,
     _: Vec3,
     uv: Vec2,
-    #[spirv(descriptor_set = 2, binding = 0)] 
-    material_color_texture: &Image2d,
-    #[spirv(descriptor_set = 2, binding = 1)]
-    material_sampler: &Sampler,
+    #[spirv(descriptor_set = 2, binding = 0)] material_color_texture: &Image2d,
+    #[spirv(descriptor_set = 2, binding = 1)] material_sampler: &Sampler,
+    #[spirv(storage_buffer, descriptor_set = 2, binding = 2)] cells: &[Cell], 
     output: &mut Vec4
 ) {
     if cfg!(feature = "rect_grid") {
         rect_grid(uv, material_color_texture, material_sampler, output);
     } else {
-        hex_grid(uv, material_color_texture, material_sampler, output);
+        hex_grid(uv, material_color_texture, material_sampler, cells, output);
     }
 }
 
@@ -28,15 +27,19 @@ fn rect_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Samp
   *output = material_color_texture.sample(*material_sampler, ((uv * world_width).floor() + 0.5) / world_width)
 }
 
-fn hex_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampler, output: &mut Vec4) {
+fn hex_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampler, cells: &[Cell], output: &mut Vec4) {
     let world_width = WORLD_WIDTH as f32;
-    let WorldCoord { x: hexel_x, y: hexel_y } = uv_to_hexel_coord(uv.x, 1.0 - uv.y);
+    let coord = uv_to_hexel_coord(uv.x, 1.0 - uv.y);
+    let WorldCoord { x: hexel_x, y: hexel_y } = coord.clone();
 
     if hexel_x > WORLD_WIDTH || hexel_y > WORLD_WIDTH {
         *output = vec4(0.0, 0.0, 0.0, 0.0);
     } else {
-        let coords = vec2(((hexel_x as f32) + 0.5) / (world_width as f32), ((hexel_y as f32) + 0.5) / (world_width as f32));
-        *output = material_color_texture.sample(*material_sampler, coords)
+        // let coords = vec2(((hexel_x as f32) + 0.5) / (world_width as f32), ((hexel_y as f32) + 0.5) / (world_width as f32));
+        *output = match cells[get_index(coord)] {
+            Cell::Alive => vec4(0.0, 0.0, 0.0, 1.0),
+            Cell::Dead => vec4(1.0, 1.0, 1.0, 1.0),
+        };// material_color_texture.sample(*material_sampler, coords)
     }
 }
 
