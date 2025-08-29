@@ -4,7 +4,7 @@ use bevy::{ecs::system::{IntoSystem, Resource}, log::info_span, render::{render_
 use biosim_core::{world::Cell, WORLD_WIDTH};
 use ndarray::{ArrayBase, ArrayView, Dim, OwnedRepr, SliceArg};
 use pollster::FutureExt;
-use wgpu::{util::BufferInitDescriptor, BindGroup, BindGroupLayoutEntry, BufferDescriptor, DeviceDescriptor, Features, InstanceDescriptor, PipelineLayout, PipelineLayoutDescriptor, ShaderStages};
+use wgpu::{util::BufferInitDescriptor, BindGroup, BindGroupLayoutEntry, BufferDescriptor, DeviceDescriptor, Features, InstanceDescriptor, Limits, PipelineLayout, PipelineLayoutDescriptor, ShaderStages};
 // use vulkano::{buffer::{BufferUsage, CpuAccessibleBuffer}, command_buffer::{allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage}, descriptor_set::{allocator::StandardDescriptorSetAllocator, layout::{DescriptorSetLayout, DescriptorType}, PersistentDescriptorSet, WriteDescriptorSet}, device::{Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags}, instance::{Instance, InstanceCreateInfo}, memory::allocator::StandardMemoryAllocator, pipeline::{ComputePipeline, Pipeline, PipelineBindPoint}, shader::{spirv::{Capability, ExecutionModel}, DescriptorRequirements, EntryPointInfo, ShaderExecution, ShaderInterface, ShaderModule, ShaderStages}, sync::{self, GpuFuture}, Version, VulkanLibrary};
 
 #[derive(Resource)]
@@ -143,7 +143,7 @@ impl BiosimComputeShader {
     pub fn new(buffer_length: usize) -> BiosimComputeShader {
         let instance = wgpu::Instance::new(InstanceDescriptor::default());
         let adapter = instance.request_adapter(&Default::default()).block_on().unwrap();
-        let (device, queue) = adapter.request_device(&DeviceDescriptor { required_features: Features::SPIRV_SHADER_PASSTHROUGH, ..Default::default() }, None).block_on().unwrap();
+        let (device, queue) = adapter.request_device(&DeviceDescriptor { required_features: Features::SPIRV_SHADER_PASSTHROUGH, required_limits: Limits { max_storage_buffer_binding_size: 268435456, ..Default::default() }, ..Default::default() }, None).block_on().unwrap();
 
         let render_device = RenderDevice::from(device);
         let render_queue = RenderQueue(queue.into());
