@@ -43,8 +43,8 @@ fn hex_grid(uv: Vec2, material_color_texture: &Image2d, material_sampler: &Sampl
 #[spirv(compute(threads(32, 32)))]
 pub fn main(
     #[spirv(global_invocation_id)] global_id: UVec3,
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] input: &[Cell],
-    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)] output: &mut [Cell],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] input: &[Cell],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] output: &mut [Cell],
 ) {
     let coord = WorldCoord { x: global_id.x as usize, y: global_id.y as usize };
     let idx = get_index(coord);

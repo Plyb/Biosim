@@ -33,7 +33,6 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
     let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH);
     compute_shader.copy_to_buffer(&world_component.0);
-    commands.insert_resource(compute_shader);
 
     let image = Image::new(
         Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 },
@@ -44,6 +43,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     );
     let image_handle = images.add(image); println!("Original: {:?}", image_handle.id());
     let world_material = WorldMaterial { hexels: image_handle }; // TODO: add buffer
+    commands.insert_resource(compute_shader);
 
     commands.spawn(MaterialMesh2dBundle {
         mesh: meshes.add(Rectangle::from_size(Vec2 { x: WORLD_WIDTH as f32 * WORLD_WIDTH_MULTIPLER, y: WORLD_WIDTH as f32 })).into(),
@@ -61,7 +61,7 @@ struct WorldMaterial {
     #[sampler(1)]
     hexels: Handle<Image>,
 
-    // #[storage(3, read_only, buffer)]
+    // #[storage(2, read_only, buffer)]
     // buffer: Buffer,
 }
 
@@ -124,6 +124,7 @@ fn update_world(
             let slice_arg = s![low.y..high.y, low.x..high.x];
             let cells_from_gpu = compute_shader.read_back(slice_arg);
             compute_shader.swap_buffers();
+            // world_material.buffer = compute_shader.input_buffer.clone();
             cells_from_gpu
         };
 
