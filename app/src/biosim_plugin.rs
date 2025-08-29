@@ -43,7 +43,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
     );
     let image_handle = images.add(image);
-    let world_material = WorldMaterial { hexels: image_handle, buffer: compute_shader.input_buffer.clone() };
+    let world_material = WorldMaterial { buffer: compute_shader.input_buffer.clone() };
     println!("built world material");
     commands.insert_resource(compute_shader);
 
@@ -60,11 +60,7 @@ struct WorldComponent(Vec<Cell>);
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct WorldMaterial {
-    #[texture(0)]
-    #[sampler(1)]
-    hexels: Handle<Image>,
-
-    #[storage(2, read_only, buffer)]
+    #[storage(0, read_only, buffer)]
     buffer: Buffer,
 }
 
@@ -95,10 +91,6 @@ fn update_world(
             break;
         };
 
-        let Some(image) = images.remove(world_material.hexels.id()) else {
-            break;
-        };
-
         let tick_span = info_span!("ticking").entered();
         let (u, v) = world_space_to_uv(camera_pos.x, camera_pos.y);
         let center = if cfg!(feature = "rect_grid") {
@@ -119,37 +111,42 @@ fn update_world(
             center.add_clamped(WorldOffset { x: CHUNK_RADIUS, y: CHUNK_RADIUS })
         };
 
-        let cell_chunk = if cfg!(feature = "cpu") {
+        if cfg!(feature = "cpu") {
+            // let Some(image) = images.remove(world_material.hexels.id()) else {
+            //     break;
+            // };
+
             world_component.0 = tick(&world_component.0);
-            ArrayView::from_shape((high.y - low.y, high.x - low.x), world_component.0.as_slice()).unwrap().to_owned()
+            compute_shader.copy_to_buffer(&world_component.0);
+            // let cell_chunk = ArrayView::from_shape((high.y - low.y, high.x - low.x), world_component.0.as_slice()).unwrap().to_owned();
+
+            // let new_bytes_flat = cell_chunk.iter().flat_map(|cell| if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect::<Vec<u8>>();
+            // let new_bytes = ArrayView::from_shape((high.y - low.y, high.x - low.x, 4), &new_bytes_flat.as_slice()).unwrap();
+            
+            // let image_lock = info_span!("image").entered();
+            // let mut dyn_img = Image::try_into_dynamic(image).unwrap();
+            // let mut image_bytes = ArrayViewMut::from_shape((WORLD_WIDTH, WORLD_WIDTH, 4), dyn_img.as_mut_rgba8().unwrap()).unwrap();
+            // image_lock.exit();
+
+            // let assign_lock = info_span!("assign").entered();
+            // image_bytes.slice_mut(s![low.y..high.y, low.x..high.x, ..]).assign(&new_bytes);
+            // assign_lock.exit();
+
+
+            // let updated_image = Image::from_dynamic(
+            //     dyn_img,
+            //     true,
+            //     RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
+            // );
+            // world_material.hexels = images.add(updated_image);
         } else {
             compute_shader.dispatch();
-            let slice_arg = s![low.y..high.y, low.x..high.x];
-            let cells_from_gpu = compute_shader.read_back(slice_arg);
+            // let slice_arg = s![low.y..high.y, low.x..high.x];
+            // let cells_from_gpu = compute_shader.read_back(slice_arg);
             compute_shader.swap_buffers();
             world_material.buffer = compute_shader.input_buffer.clone();
-            cells_from_gpu
+            // cells_from_gpu
         };
-
-        let new_bytes_flat = cell_chunk.iter().flat_map(|cell| if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect::<Vec<u8>>();
-        let new_bytes = ArrayView::from_shape((high.y - low.y, high.x - low.x, 4), &new_bytes_flat.as_slice()).unwrap();
-        
-        let image_lock = info_span!("image").entered();
-        let mut dyn_img = Image::try_into_dynamic(image).unwrap();
-        let mut image_bytes = ArrayViewMut::from_shape((WORLD_WIDTH, WORLD_WIDTH, 4), dyn_img.as_mut_rgba8().unwrap()).unwrap();
-        image_lock.exit();
-
-        let assign_lock = info_span!("assign").entered();
-        image_bytes.slice_mut(s![low.y..high.y, low.x..high.x, ..]).assign(&new_bytes);
-        assign_lock.exit();
-
-
-        let updated_image = Image::from_dynamic(
-            dyn_img,
-            true,
-            RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
-        );
-        world_material.hexels = images.add(updated_image);
 
         tick_span.exit();
   }

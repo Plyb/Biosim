@@ -82,11 +82,11 @@ impl BiosimComputeShader {
             layout: &self.pipeline.get_bind_group_layout(0),
             entries: &[
                 wgpu::BindGroupEntry {
-                    binding: 2,
+                    binding: 0,
                     resource: self.input_buffer.as_entire_binding()
                 },
                 wgpu::BindGroupEntry {
-                    binding: 3,
+                    binding: 1,
                     resource: self.output_buffer.as_entire_binding()
                 },
             ]
@@ -96,6 +96,13 @@ impl BiosimComputeShader {
     pub fn copy_to_buffer(&self, input: &[Cell]) {
         // let mut content = self.input_buffer.write().unwrap();
         {
+            let (tx, rx) = channel();
+            self.staging_input_buffer.slice(..).map_async(wgpu::MapMode::Write, move |result| {
+                tx.send(result).unwrap()
+            });
+            self.render_device.poll(wgpu::Maintain::Wait);
+            rx.recv().unwrap().unwrap();
+
             let mut content = self.staging_input_buffer.slice(..).get_mapped_range_mut();
             for (src, dst) in bytemuck::cast_slice(input).iter().zip(content.iter_mut()) {
                 *dst = *src;
@@ -265,7 +272,7 @@ impl BiosimComputeShader {
             // contents: bytemuck::cast_slice(vec![Cell::Dead; buffer_length].as_slice()),
             size: (buffer_length * mem::size_of::<Cell>()) as u64,
             usage: wgpu::BufferUsages::MAP_WRITE | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: true,
+            mapped_at_creation: false,
         });
         let input_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             label: Some("buffer a"),
@@ -287,13 +294,13 @@ impl BiosimComputeShader {
 
         let bind_group_layout = render_device.create_bind_group_layout(Some("bind group layout"), &[
             BindGroupLayoutEntry {
-                binding: 2,
+                binding: 0,
                 visibility: ShaderStages::COMPUTE | ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: Some(NonZero::new(input_buffer.size()).unwrap()) },
                 count: None,
             },
             BindGroupLayoutEntry {
-                binding: 3,
+                binding: 1,
                 visibility: ShaderStages::COMPUTE | ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: Some(NonZero::new(output_buffer.size()).unwrap()) },
                 count: None,
@@ -322,11 +329,11 @@ impl BiosimComputeShader {
             layout: &pipeline.get_bind_group_layout(0),
             entries: &[
                 wgpu::BindGroupEntry {
-                    binding: 2,
+                    binding: 0,
                     resource: input_buffer.as_entire_binding()
                 },
                 wgpu::BindGroupEntry {
-                    binding: 3,
+                    binding: 1,
                     resource: output_buffer.as_entire_binding()
                 },
             ]
