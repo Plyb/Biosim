@@ -1,10 +1,8 @@
-use std::{any::Any, vec};
+use std::vec;
 
-use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_asset::RenderAssetUsages, render_resource::{AsBindGroup, Buffer, Extent3d, ShaderRef, TextureDimension, TextureFormat}, renderer::{RenderDevice, RenderQueue}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
+use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_resource::{AsBindGroup, Buffer, ShaderRef}, renderer::{RenderDevice, RenderQueue}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
-use biosim_core::{hex_grid::{uv_to_hexel_coord, uv_to_rect_grid_coord, world_space_to_uv}, world::{Cell, WorldCoord, WorldOffset}, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
-use ndarray::{s, ArrayView, ArrayViewMut};
-use wgpu::util::BufferInitDescriptor;
+use biosim_core::{world::Cell, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
 
 use crate::world::{new_random, tick};
 use crate::compute_shader::BiosimComputeShader;
@@ -25,7 +23,7 @@ impl Plugin for BiosimPlugin {
 #[derive(Resource)]
 struct WorldTickTimer(Timer);
 
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>, mut images: ResMut<Assets<Image>>, render_device: Res<RenderDevice>, render_queue: Res<RenderQueue>) {
+fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>, render_device: Res<RenderDevice>, render_queue: Res<RenderQueue>) {
     commands.spawn(Camera2dBundle::default())
         .insert(PanCam::default());
 
@@ -35,16 +33,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     let compute_shader = BiosimComputeShader::new(WORLD_WIDTH * WORLD_WIDTH, render_device.clone(), render_queue.clone());
     compute_shader.copy_to_buffer(&world_component.0);
 
-    let image = Image::new(
-        Extent3d { width: WORLD_WIDTH as u32, height: WORLD_WIDTH as u32, depth_or_array_layers: 1 },
-        TextureDimension::D2,
-        vec![u8::MAX; WORLD_WIDTH * WORLD_WIDTH * 4],
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
-    );
-    let image_handle = images.add(image);
-    let world_material = WorldMaterial { buffer: compute_shader.input_buffer.clone() };
-    println!("built world material");
+    let world_material = WorldMaterial { buffer: compute_shader.get_cells_buffer() };
     commands.insert_resource(compute_shader);
 
     commands.spawn(MaterialMesh2dBundle {
@@ -52,7 +41,6 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         material: materials.add(world_material),
         ..default()
     }).insert(world_component);
-    println!("finished setup");
 } 
 
 #[derive(Component)]
@@ -72,19 +60,15 @@ impl Material2d for WorldMaterial {
 
 fn update_world(
     mut materials: ResMut<Assets<WorldMaterial>>,
-    mut images: ResMut<Assets<Image>>,
     mut timer: ResMut<WorldTickTimer>,
     time: Res<Time>,
     mut world_query: Query<(&mut WorldComponent, &Handle<WorldMaterial>)>,
     mut compute_shader: ResMut<BiosimComputeShader>,
-    camera_query: Query<&GlobalTransform, With<Camera>>,
 ) {
     if !timer.0.tick(time.delta()).just_finished() {
         return;
     }
     let _true_update_world_span = info_span!("update_world_past_timer").entered();
-
-    let camera_pos = camera_query.get_single().unwrap().translation();
 
     for (mut world_component, mesh_handle) in &mut world_query {
         let Some(world_material) = materials.get_mut(mesh_handle.id()) else {
@@ -92,60 +76,14 @@ fn update_world(
         };
 
         let tick_span = info_span!("ticking").entered();
-        let (u, v) = world_space_to_uv(camera_pos.x, camera_pos.y);
-        let center = if cfg!(feature = "rect_grid") {
-            uv_to_rect_grid_coord(u, v)
-        } else {
-            uv_to_hexel_coord(u, v)
-        };
-
-        const CHUNK_RADIUS: i32 = 256;
-        let low = if cfg!(feature = "cpu") {
-            WorldCoord::min()
-        } else {
-            center.add_clamped(WorldOffset { x: -CHUNK_RADIUS, y: -CHUNK_RADIUS })
-        };
-        let high = if cfg!(feature = "cpu") {
-            WorldCoord::max()
-        } else {
-            center.add_clamped(WorldOffset { x: CHUNK_RADIUS, y: CHUNK_RADIUS })
-        };
 
         if cfg!(feature = "cpu") {
-            // let Some(image) = images.remove(world_material.hexels.id()) else {
-            //     break;
-            // };
-
             world_component.0 = tick(&world_component.0);
             compute_shader.copy_to_buffer(&world_component.0);
-            // let cell_chunk = ArrayView::from_shape((high.y - low.y, high.x - low.x), world_component.0.as_slice()).unwrap().to_owned();
-
-            // let new_bytes_flat = cell_chunk.iter().flat_map(|cell| if *cell == Cell::Alive { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect::<Vec<u8>>();
-            // let new_bytes = ArrayView::from_shape((high.y - low.y, high.x - low.x, 4), &new_bytes_flat.as_slice()).unwrap();
-            
-            // let image_lock = info_span!("image").entered();
-            // let mut dyn_img = Image::try_into_dynamic(image).unwrap();
-            // let mut image_bytes = ArrayViewMut::from_shape((WORLD_WIDTH, WORLD_WIDTH, 4), dyn_img.as_mut_rgba8().unwrap()).unwrap();
-            // image_lock.exit();
-
-            // let assign_lock = info_span!("assign").entered();
-            // image_bytes.slice_mut(s![low.y..high.y, low.x..high.x, ..]).assign(&new_bytes);
-            // assign_lock.exit();
-
-
-            // let updated_image = Image::from_dynamic(
-            //     dyn_img,
-            //     true,
-            //     RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD
-            // );
-            // world_material.hexels = images.add(updated_image);
         } else {
             compute_shader.dispatch();
-            // let slice_arg = s![low.y..high.y, low.x..high.x];
-            // let cells_from_gpu = compute_shader.read_back(slice_arg);
             compute_shader.swap_buffers();
-            world_material.buffer = compute_shader.input_buffer.clone();
-            // cells_from_gpu
+            world_material.buffer = compute_shader.get_cells_buffer();
         };
 
         tick_span.exit();

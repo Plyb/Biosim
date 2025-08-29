@@ -2,7 +2,7 @@
 #![cfg_attr(target_arch = "spirv", no_std)]
 
 use biosim_core::{hex_grid::{uv_to_hexel_coord, uv_to_rect_grid_coord}, world::{get_index, Cell, WorldCoord, WorldCursor}, WORLD_WIDTH};
-use spirv_std::{glam::{vec2, vec4, UVec3, Vec2, Vec3, Vec4}, image::Image2d, spirv, Sampler};
+use spirv_std::{glam::{vec4, UVec3, Vec2, Vec3, Vec4}, spirv};
 
 #[spirv(fragment)]
 pub fn fragment(
