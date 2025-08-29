@@ -29,9 +29,8 @@ impl BiosimComputeShader {
             pass.dispatch_workgroups(WORLD_WIDTH as u32 / THREADS_PER_WORKGROUP, WORLD_WIDTH as u32 / THREADS_PER_WORKGROUP, 1);
         }
 
-        self.render_queue.submit([encoder.finish()]);
-        
         let gpu_execution_span = info_span!("gpu").entered();
+        self.render_queue.submit([encoder.finish()]);        
         self.render_device.poll(wgpu::Maintain::Wait);
         gpu_execution_span.exit();
     }
@@ -63,6 +62,7 @@ impl BiosimComputeShader {
     }
 
     pub fn copy_to_buffer(&self, input: &[Cell]) {
+        let _copy_span = info_span!("copy_to_buffer");
         {
             self.map_buffer(&self.staging_input_buffer, wgpu::MapMode::Write);
 
