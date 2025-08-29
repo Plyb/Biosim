@@ -94,11 +94,9 @@ impl BiosimComputeShader {
     }
 
     pub fn copy_to_buffer(&self, input: &[Cell]) {
-        println!("copying");
         // let mut content = self.input_buffer.write().unwrap();
         {
             let mut content = self.staging_input_buffer.slice(..).get_mapped_range_mut();
-            println!("after mapping copy");
             for (src, dst) in bytemuck::cast_slice(input).iter().zip(content.iter_mut()) {
                 *dst = *src;
             }
@@ -106,15 +104,11 @@ impl BiosimComputeShader {
         let mut encoder = self.render_device.create_command_encoder(&Default::default());
         encoder.copy_buffer_to_buffer(&self.staging_input_buffer, 0, &self.input_buffer, 0, self.staging_input_buffer.size());
         self.staging_input_buffer.unmap();
-        println!("before copy submission");
         self.render_queue.submit([encoder.finish()]);
-        println!("after copy submission");
         self.render_device.poll(wgpu::Maintain::Wait);
     }
 
     pub fn read_back<S: SliceArg<Dim<[usize; 2]>>>(&self, slice_arg: S) -> ArrayBase<OwnedRepr<Cell>, S::OutDim> {
-        println!("reading back");
-
         let _readback_span = info_span!("readback").entered();
         let mut encoder = self.render_device.create_command_encoder(&Default::default());
         encoder.copy_buffer_to_buffer(&self.output_buffer, 0, &self.staging_output_buffer, 0, self.output_buffer.size());
@@ -130,9 +124,7 @@ impl BiosimComputeShader {
             rx.recv().unwrap().unwrap();
 
             // let read_lock = self.output_buffer.read().unwrap();
-            println!("before mapping");
             let output_data = self.staging_output_buffer.slice(..).get_mapped_range();
-            println!("after mapping");
 
             let gpu_chunk_lock = info_span!("gpu_chunk").entered();
             let bytes_from_gpu = ArrayView::from_shape((WORLD_WIDTH, WORLD_WIDTH, mem::size_of::<Cell>()), &output_data).unwrap();
@@ -253,9 +245,7 @@ impl BiosimComputeShader {
         //             output_interface: ShaderInterface::new_unchecked(vec! []),
         //         }
         //     )])}.unwrap();
-        println!("before shader");
         let shader = unsafe { render_device.wgpu_device().create_shader_module_spirv(&wgpu::include_spirv_raw!(env!("biosim_rust_shader.spv"))) };
-        println!("after shader");
 
         // let memory_allocator = StandardMemoryAllocator::new_default(device.clone());
         // let input_buffer = CpuAccessibleBuffer::from_iter(
@@ -296,8 +286,6 @@ impl BiosimComputeShader {
             mapped_at_creation: false,
         });
 
-        println!("after buffer creation");
-
         let bind_group_layout = render_device.create_bind_group_layout(Some("bind group layout"), &[
             BindGroupLayoutEntry {
                 binding: 2,
@@ -329,8 +317,6 @@ impl BiosimComputeShader {
             entry_point: "main",
         });
 
-        println!("after pipeline creation");
-
         // let layout = pipeline.layout().set_layouts().get(0).unwrap();
         let bind_group = render_device.wgpu_device().create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -353,7 +339,6 @@ impl BiosimComputeShader {
         //     [WriteDescriptorSet::buffer(0, input_buffer.clone()), WriteDescriptorSet::buffer(1, output_buffer.clone())],
         // ).unwrap();
 
-        println!("making BiosimComputeShader");
         // let buffer_allocator = StandardCommandBufferAllocator::new(device.clone(), Default::default());
         BiosimComputeShader { render_device, render_queue, pipeline, bind_group, staging_input_buffer, input_buffer, output_buffer, staging_output_buffer } // TODO: staging input buffer shouldn't be passed on
     }
