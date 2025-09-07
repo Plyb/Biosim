@@ -1,4 +1,4 @@
-use std::{thread, vec};
+use std::{path::Path, thread, vec};
 
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_resource::{AsBindGroup, Buffer, ShaderRef}, renderer::{RenderDevice, RenderQueue}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
@@ -24,6 +24,8 @@ impl Plugin for BiosimPlugin {
 #[derive(Resource)]
 struct WorldTickTimer(Timer);
 
+const SNAPSHOT_PATH: &str = "./snapshots";
+
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<WorldMaterial>>, render_device: Res<RenderDevice>, render_queue: Res<RenderQueue>) {
     commands.spawn(Camera2dBundle::default())
         .insert(PanCam::default());
@@ -43,8 +45,8 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         ..default()
     }).insert(world_component);
 
-    std::fs::remove_dir_all("./snapshots").unwrap();
-    std::fs::create_dir("./snapshots").unwrap();
+    std::fs::remove_dir_all(SNAPSHOT_PATH).unwrap();
+    std::fs::create_dir(SNAPSHOT_PATH).unwrap();
 } 
 
 #[derive(Component)]
@@ -92,7 +94,7 @@ fn update_world(
             let cells = compute_shader.read_back(s![..,..]);
             let timestamp = time.elapsed().as_millis();
             thread::spawn(move || {
-                ciborium::into_writer(&cells.flatten().to_vec(), std::fs::File::create("./snapshots/".to_owned() + &timestamp.to_string()).unwrap()).unwrap();
+                ciborium::into_writer(&cells.flatten().to_vec(), std::fs::File::create(Path::new(SNAPSHOT_PATH).join(&timestamp.to_string())).unwrap()).unwrap();
             });
         };
 
