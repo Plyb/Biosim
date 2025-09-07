@@ -11,7 +11,6 @@ biosim-core = { path = "../biosim-core"}
 ndarray = "0.16.0"
 wgpu = "0.19.4"
 bytemuck = "1.23.2"
-ciborium = "0.2.2"
 
 [build-dependencies]
 spirv-builder = { version = "0.9" }

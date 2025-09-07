@@ -111,7 +111,7 @@ fn update_world(
                     let cells_flat = cells.flatten();
                     let slice = cells_flat.as_slice().unwrap();
                     let bytes: &[u8] = cast_slice(slice);
-                    ciborium::into_writer(bytes, std::fs::File::create(Path::new(SNAPSHOT_PATH).join(&timestamp.to_string())).unwrap()).unwrap();
+                    std::fs::write(Path::new(SNAPSHOT_PATH).join(&timestamp.to_string()), bytes).unwrap();
                 });
                 snapshot_manager.saving_handle = Some(handle);
             }
