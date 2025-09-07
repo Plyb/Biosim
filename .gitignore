@@ -2,3 +2,4 @@
 /shader/target/*
 /app/target
 trace-*.json
+/snapshots

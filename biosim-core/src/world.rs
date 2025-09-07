@@ -2,13 +2,14 @@ use core::ops;
 
 use bytemuck::{Pod, Zeroable};
 use rand::{distributions::{Distribution, Standard}, Rng};
+use serde::Serialize;
 
 use crate::WORLD_WIDTH;
 
 use crate::util::DOption;
 
 #[repr(u32)]
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize)]
 pub enum Cell {
     Dead = 0,
     Alive = 1,

@@ -1,8 +1,9 @@
-use std::vec;
+use std::{thread, vec};
 
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_resource::{AsBindGroup, Buffer, ShaderRef}, renderer::{RenderDevice, RenderQueue}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
 use biosim_core::{world::Cell, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
+use ndarray::s;
 
 use crate::world::{new_random, tick};
 use crate::compute_shader::BiosimComputeShader;
@@ -41,6 +42,9 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         material: materials.add(world_material),
         ..default()
     }).insert(world_component);
+
+    std::fs::remove_dir_all("./snapshots").unwrap();
+    std::fs::create_dir("./snapshots").unwrap();
 } 
 
 #[derive(Component)]
@@ -84,6 +88,12 @@ fn update_world(
             compute_shader.dispatch();
             compute_shader.swap_buffers();
             world_material.buffer = compute_shader.get_cells_buffer();
+
+            let cells = compute_shader.read_back(s![..,..]);
+            let timestamp = time.elapsed().as_millis();
+            thread::spawn(move || {
+                ciborium::into_writer(&cells.flatten().to_vec(), std::fs::File::create("./snapshots/".to_owned() + &timestamp.to_string()).unwrap()).unwrap();
+            });
         };
 
         tick_span.exit();
