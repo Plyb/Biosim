@@ -1,4 +1,4 @@
-use std::{path::Path, thread, vec};
+use std::{path::Path, thread::{self, JoinHandle}, vec};
 
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_resource::{AsBindGroup, Buffer, ShaderRef}, renderer::{RenderDevice, RenderQueue}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
@@ -47,6 +47,8 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
     std::fs::remove_dir_all(SNAPSHOT_PATH).unwrap();
     std::fs::create_dir(SNAPSHOT_PATH).unwrap();
+
+    commands.insert_resource(SnapshotManager { saving_handle: None });
 } 
 
 #[derive(Component)]
@@ -64,12 +66,18 @@ impl Material2d for WorldMaterial {
     }
 }
 
+#[derive(Resource)]
+struct SnapshotManager {
+    saving_handle: Option<JoinHandle<()>>
+}
+
 fn update_world(
     mut materials: ResMut<Assets<WorldMaterial>>,
     mut timer: ResMut<WorldTickTimer>,
     time: Res<Time>,
     mut world_query: Query<(&mut WorldComponent, &Handle<WorldMaterial>)>,
     mut compute_shader: ResMut<BiosimComputeShader>,
+    mut snapshot_manager: ResMut<SnapshotManager>,
 ) {
     if !timer.0.tick(time.delta()).just_finished() {
         return;
@@ -91,11 +99,19 @@ fn update_world(
             compute_shader.swap_buffers();
             world_material.buffer = compute_shader.get_cells_buffer();
 
-            let cells = compute_shader.read_back(s![..,..]);
-            let timestamp = time.elapsed().as_millis();
-            thread::spawn(move || {
-                ciborium::into_writer(&cells.flatten().to_vec(), std::fs::File::create(Path::new(SNAPSHOT_PATH).join(&timestamp.to_string())).unwrap()).unwrap();
-            });
+            let should_save_snapshot = match &snapshot_manager.saving_handle {
+                Some(saving_handle) => saving_handle.is_finished(),
+                None => true,
+            };
+            if should_save_snapshot {
+                let cells = compute_shader.read_back(s![..,..]);
+                let timestamp = time.elapsed().as_millis();
+                let handle = thread::spawn(move || {
+                    ciborium::into_writer(&cells.flatten().to_vec(), std::fs::File::create(Path::new(SNAPSHOT_PATH).join(&timestamp.to_string())).unwrap()).unwrap();
+                });
+                snapshot_manager.saving_handle = Some(handle);
+            }
+            
         };
 
         tick_span.exit();
