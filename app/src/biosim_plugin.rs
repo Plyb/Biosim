@@ -3,6 +3,7 @@ use std::{path::Path, thread::{self, JoinHandle}, vec};
 use bevy::{app::{App, Plugin, Startup, Update}, asset::Assets, core_pipeline::core_2d::Camera2dBundle, ecs::{component::Component, system::{Commands, Query, Res, ResMut, Resource}}, render::{mesh::Mesh, render_resource::{AsBindGroup, Buffer, ShaderRef}, renderer::{RenderDevice, RenderQueue}}, sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle}, time::{Time, Timer, TimerMode}};
 use bevy_pancam::{PanCam, PanCamPlugin};
 use biosim_core::{world::Cell, WORLD_WIDTH, WORLD_WIDTH_MULTIPLER};
+use bytemuck::cast_slice;
 use ndarray::s;
 
 use crate::world::{new_random, tick};
@@ -107,7 +108,10 @@ fn update_world(
                 let cells = compute_shader.read_back(s![..,..]);
                 let timestamp = time.elapsed().as_millis();
                 let handle = thread::spawn(move || {
-                    ciborium::into_writer(&cells.flatten().to_vec(), std::fs::File::create(Path::new(SNAPSHOT_PATH).join(&timestamp.to_string())).unwrap()).unwrap();
+                    let cells_flat = cells.flatten();
+                    let slice = cells_flat.as_slice().unwrap();
+                    let bytes: &[u8] = cast_slice(slice);
+                    ciborium::into_writer(bytes, std::fs::File::create(Path::new(SNAPSHOT_PATH).join(&timestamp.to_string())).unwrap()).unwrap();
                 });
                 snapshot_manager.saving_handle = Some(handle);
             }

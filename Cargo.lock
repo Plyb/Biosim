@@ -1076,7 +1076,6 @@ dependencies = [
  "bytemuck",
  "libm",
  "rand",
- "serde",
 ]
 
 [[package]]
@@ -1090,7 +1089,6 @@ dependencies = [
  "ciborium",
  "ndarray",
  "rand",
- "serde",
  "spirv-builder",
  "wgpu",
 ]
